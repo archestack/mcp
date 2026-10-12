@@ -1,0 +1,45 @@
+name: release
+
+# Push a tag vX.Y.Z whose version matches package.json and server.json. npm trusted publishing
+# (OIDC, no token) publishes the package with provenance; the same job then lists the version in
+# the MCP Registry under io.github.archestack/mcp, signed in through GitHub OIDC.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false # no cache in release builds
+      - run: npm install -g npm@11.20.0 # trusted publishing needs npm 11.5.1 or later
+      - run: npm ci
+      - name: tag, package.json and server.json name the same version
+        run: |
+          node -e '
+            const tag = process.env.GITHUB_REF_NAME.replace(/^v/, "");
+            const pkg = require("./package.json");
+            const server = require("./server.json");
+            const versions = [pkg.version, server.version, ...server.packages.map((p) => p.version)];
+            if (versions.some((v) => v !== tag)) throw new Error(`tag ${tag}, files ${versions}`);
+          '
+      - run: npm publish
+      - name: list the version in the MCP Registry
+        run: |
+          curl -fsSL -o mcp-publisher.tar.gz https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz
+          echo "a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc  mcp-publisher.tar.gz" | sha256sum -c -
+          tar xzf mcp-publisher.tar.gz mcp-publisher
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish

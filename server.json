@@ -1,0 +1,17 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.archestack/mcp",
+  "title": "Archestack",
+  "description": "Search, rank and compare open-source AI projects with Archestack's open data",
+  "repository": { "url": "https://github.com/archestack/mcp", "source": "github" },
+  "websiteUrl": "https://archestack.com/api/",
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@archestack/mcp",
+      "version": "0.1.0",
+      "transport": { "type": "stdio" }
+    }
+  ]
+}

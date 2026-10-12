@@ -1,0 +1,62 @@
+{
+  "name": "@archestack/mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Archestack: search, rank and compare open-source AI projects from archestack.com's open data",
+  "mcpName": "io.github.archestack/mcp",
+  "license": "MIT",
+  "author": "Archestack (https://archestack.com/)",
+  "homepage": "https://github.com/archestack/mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/archestack/mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/archestack/mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "open-source",
+    "self-hosted",
+    "ai",
+    "llm",
+    "rankings"
+  ],
+  "type": "module",
+  "bin": {
+    "archestack-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . && prettier --check src test scripts",
+    "test": "npm run build && node --test test/*.test.ts",
+    "fixtures": "node scripts/record-fixtures.ts",
+    "prepublishOnly": "npm run lint && npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.2.0",
+    "ky": "^2.1.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@modelcontextprotocol/client": "^2.2.0",
+    "@types/node": "^24.19.0",
+    "eslint": "^10.12.0",
+    "prettier": "^3.9.9",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.1"
+  }
+}
