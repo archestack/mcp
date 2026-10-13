@@ -1,8 +1,10 @@
 name: release
 
-# Push a tag vX.Y.Z whose version matches package.json and server.json. npm trusted publishing
-# (OIDC, no token) publishes the package with provenance; the same job then lists the version in
-# the MCP Registry under io.github.archestack/mcp, signed in through GitHub OIDC.
+# Push a tag vX.Y.Z whose version matches package.json and server.json. Job `npm` publishes the
+# package through npm trusted publishing (OIDC, no token), with provenance. Job `registry` waits
+# until npm serves that version (npm can take several minutes to process a release), then lists it
+# in the MCP Registry as io.github.archestack/mcp, signed in through GitHub OIDC. If `registry`
+# fails, "Re-run failed jobs" retries it alone, without publishing to npm again.
 on:
   push:
     tags: ['v*']
@@ -11,7 +13,7 @@ permissions:
   contents: read
 
 jobs:
-  publish:
+  npm:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -36,6 +38,27 @@ jobs:
             if (versions.some((v) => v !== tag)) throw new Error(`tag ${tag}, files ${versions}`);
           '
       - run: npm publish
+
+  registry:
+    needs: npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: wait until npm serves this version (up to about 20 minutes)
+        run: |
+          url="https://registry.npmjs.org/@archestack%2fmcp/${GITHUB_REF_NAME#v}"
+          for i in $(seq 1 20); do
+            code=$(curl -sS -m 15 -o /dev/null -w '%{http_code}' "$url" || true)
+            if [ "$code" = 200 ]; then exit 0; fi
+            echo "npm answers $code, try $i"
+            sleep $(( (i < 6 ? i * 10 : 60) + RANDOM % 10 ))
+          done
+          echo "::error::npm still does not serve ${GITHUB_REF_NAME#v}"
+          exit 1
       - name: list the version in the MCP Registry
         run: |
           curl -fsSL -o mcp-publisher.tar.gz https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz
