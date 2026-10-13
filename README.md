@@ -1,5 +1,7 @@
 # Archestack MCP server
 
+[![npm](https://img.shields.io/npm/v/%40archestack%2Fmcp?label=npm)](https://www.npmjs.com/package/@archestack/mcp) [![license: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/archestack/mcp/blob/main/LICENSE)
+
 Ask your assistant about open-source AI projects and get answers from the [Archestack](https://archestack.com/) rankings: scores, GitHub facts, reviews and open-source picks for paid tools.
 
 It covers two lists:
@@ -11,7 +13,9 @@ The server runs on your machine and reads the [open data API](https://archestack
 
 ## Install
 
-Needs Node.js 22 or newer.
+Needs Node.js 22 or newer. One click for Cursor or VS Code:
+
+[![Add to Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=archestack&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBhcmNoZXN0YWNrL21jcCJdfQ==) [![Add to VS Code](https://img.shields.io/badge/VS_Code-Add_server-0098FF?logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=archestack&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40archestack%2Fmcp%22%5D%7D)
 
 **Claude Code**
 
@@ -31,6 +35,12 @@ claude mcp add archestack -- npx -y @archestack/mcp
 
 **Cursor**: the same `mcpServers` block in `~/.cursor/mcp.json`, or in `.cursor/mcp.json` for one project.
 
+**VS Code** without the button:
+
+```bash
+code --add-mcp '{"name":"archestack","command":"npx","args":["-y","@archestack/mcp"]}'
+```
+
 **From source**
 
 ```bash
@@ -43,13 +53,13 @@ Then point your client at `node /full/path/to/archestack-mcp/dist/index.js` inst
 
 ## Tools
 
-| Tool | What it does |
-|---|---|
+| Tool              | What it does                                                                                                    |
+| ----------------- | --------------------------------------------------------------------------------------------------------------- |
 | `search_projects` | Finds projects by words and filters: list, category, license family, runs without a GPU, arm64 build, live demo |
-| `get_project` | One project in full: score and its parts, place in its category, GitHub facts, health, links, review |
-| `top_in_category` | The ranking of one category, best first |
-| `compare` | 2 to 4 projects side by side |
-| `alternatives_to` | Open-source picks for a paid product, such as Cursor or ChatGPT |
+| `get_project`     | One project in full: score and its parts, place in its category, GitHub facts, health, links, review            |
+| `top_in_category` | The ranking of one category, best first                                                                         |
+| `compare`         | 2 to 4 projects side by side                                                                                    |
+| `alternatives_to` | Open-source picks for a paid product, such as Cursor or ChatGPT                                                 |
 
 All five are read-only. Things to ask:
 
@@ -57,6 +67,29 @@ All five are read-only. Things to ask:
 - "Open-source alternatives to Cursor"
 - "Compare Open WebUI and LibreChat"
 - "Top 5 coding agents with an arm64 build"
+
+What comes back, shortened (`search_projects` with "vector database" and `no_gpu`, data of 2026-10-13):
+
+```json
+{
+  "updated": "2026-10-13",
+  "total": 15,
+  "results": [
+    {
+      "name": "Milvus",
+      "place": 1,
+      "score": 81,
+      "stars": 46366,
+      "license": "Apache-2.0",
+      "gpu": "optional",
+      "arm64": true,
+      "tagline": "Distributed vector database with dense, sparse and hybrid search at scale",
+      "page": "https://archestack.com/best-of-ai/projects/milvus/"
+    },
+    { "name": "Meilisearch", "place": 2, "score": 75, "gpu": "none", "...": "..." }
+  ]
+}
+```
 
 ## How it works
 
