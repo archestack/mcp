@@ -70,7 +70,7 @@ export function createServer(api: Api, version: string) {
     {
       title: 'Search projects',
       description:
-        'Find open-source AI projects across both Archestack lists by words and filters. Words match names, repos, taglines, categories and the products a project replaces; results rank by how many words match, then by score. Put hard needs in the filters, not the words (no_gpu instead of "without a GPU").',
+        'Find open-source AI projects across both Archestack lists by words and filters. Words match names, repos, taglines, categories and the products a project replaces; results rank by how many words match, then exact names, then projects whose name or category holds the words, then by score. Put hard needs in the filters, not the words (no_gpu instead of "without a GPU").',
       inputSchema: searchInput,
       annotations: READ_ONLY,
     },
@@ -140,11 +140,12 @@ async function searchProjects(api: Api, args: z.output<typeof searchInput>) {
   const category = args.category ? findCategory(index, args.category, args.list) : undefined;
   const titles = categoryTitles(index);
   const words = wordsOf(args.query ?? '').filter((w) => w.length > 1 && !STOP_WORDS.has(w));
+  const exact = squash(args.query ?? '');
   const hits = projects
     .filter((p) => passesFilters(p, args, category))
-    .map((p) => ({ p, ...matchWords(p, words, titles.get(categoryKey(p)) ?? '') }))
+    .map((p) => ({ p, ...relevance(p, words, titles.get(categoryKey(p)) ?? '', exact) }))
     .filter((h) => words.length === 0 || h.matched > 0)
-    .sort((a, b) => b.matched - a.matched || b.weight - a.weight || b.p.score - a.p.score);
+    .sort((a, b) => b.matched - a.matched || b.tier - a.tier || b.p.score - a.p.score);
   return {
     updated,
     total: hits.length,
@@ -210,26 +211,19 @@ const categoryTitles = (index: Index) =>
     index.lists.flatMap((l) => l.categories.map((c) => [`${l.id}/${c.id}`, c.title])),
   );
 
-// A word scores the best field it starts a word in: name or repo 3, a replaced product 3,
-// category 2, tagline 1.
-function matchWords(p: Row, words: string[], categoryTitle: string) {
-  const fields = [
-    [`${p.name} ${p.repo}`, 3],
-    [p.alternative_to.join(' '), 3],
-    [`${p.category} ${categoryTitle}`, 2],
-    [p.tagline, 1],
-  ] as const;
-  const fieldWords = fields.map(([text, weight]) => ({ words: wordsOf(text), weight }));
-  const weights = words.map((w) =>
-    Math.max(
-      0,
-      ...fieldWords.filter((f) => f.words.some((x) => x.startsWith(w))).map((f) => f.weight),
-    ),
+// How many query words start a word in the project's text, and a tier: 2 when the query is the
+// project's name or repo, 1 when every word is in what the project is (name, repo, category, a
+// product it replaces) rather than only in its tagline, else 0.
+function relevance(p: Row, words: string[], categoryTitle: string, exact: string) {
+  const identity = wordsOf(
+    `${p.name} ${p.repo} ${p.alternative_to.join(' ')} ${p.category} ${categoryTitle}`,
   );
-  return {
-    matched: weights.filter((n) => n > 0).length,
-    weight: weights.reduce((a, b) => a + b, 0),
-  };
+  const hits = (pool: string[]) => words.filter((w) => pool.some((x) => x.startsWith(w))).length;
+  const matched = hits([...identity, ...wordsOf(p.tagline)]);
+  const named =
+    exact !== '' && [p.name, p.repo, p.repo.split('/')[1] ?? ''].some((k) => squash(k) === exact);
+  const tier = named ? 2 : matched === words.length && hits(identity) === words.length ? 1 : 0;
+  return { matched, tier };
 }
 
 function passesFilters(

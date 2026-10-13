@@ -15,6 +15,8 @@ const recorded = JSON.parse(await readFile(new URL('projects.json', fixtures), '
   projects: {
     id: string;
     list: string;
+    category: string;
+    score: number;
     license_family: string;
     arm64: boolean;
     demo: string | null;
@@ -87,6 +89,17 @@ describe('archestack-mcp over stdio', () => {
     assert.equal(body.results[0].category, 'Vector databases');
     assert.ok(body.results.every((p: { gpu: string }) => ['none', 'optional'].includes(p.gpu)));
     assert.match(body.source, /archestack\.com/);
+  });
+
+  it('search_projects puts an exact name first, then what a project is over its tagline', async () => {
+    const named = await answer('search_projects', { query: 'Qdrant', limit: 3 });
+    assert.equal(named.results[0].id, 'best-of-ai/qdrant');
+    const kind = await answer('search_projects', { query: 'coding agent', limit: 5 });
+    assert.equal(kind.results[0].category, 'Coding agents and assistants');
+    const top = recorded.projects
+      .filter((p) => p.list === 'best-of-vibe-coding' && p.category === 'coding-agents')
+      .sort((a, b) => b.score - a.score)[0]!;
+    assert.equal(kind.results[0].id, top.id);
   });
 
   it('search_projects without words returns every project that passes the filters', async () => {
