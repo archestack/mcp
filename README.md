@@ -84,7 +84,8 @@ What comes back, shortened (`search_projects` with "vector database" and `no_gpu
       "gpu": "optional",
       "arm64": true,
       "tagline": "Distributed vector database with dense, sparse and hybrid search at scale",
-      "page": "https://archestack.com/best-of-ai/projects/milvus/"
+      "source_url": "https://archestack.com/best-of-ai/projects/milvus/",
+      "checked_at": "2026-10-13"
     },
     { "name": "Meilisearch", "place": 2, "score": 75, "gpu": "none", "...": "..." }
   ]
@@ -96,12 +97,12 @@ What comes back, shortened (`search_projects` with "vector database" and `no_gpu
 - It talks to archestack.com and nothing else. The API is static JSON served with the site. The server sends nothing about you or your questions and has no telemetry.
 - The server checks each file against the JSON Schema published next to it ([/api/v1/schema/](https://archestack.com/api/v1/schema/project.json)). If a file does not match, you get an error instead of a made-up answer.
 - Each request times out after 8 seconds, with two retries and backoff. The server keeps each file in memory for an hour; Archestack refreshes the data twice a day.
-- Answers include the date of the data and links to the project pages.
+- Every project in an answer carries `source_url`, its page on archestack.com, and `checked_at`, the date its facts were checked on GitHub.
 - `ARCHESTACK_API_URL` points the server at another copy of the API. The tests use it for a local one.
 
 ## Data and license
 
-The code is MIT. The data is [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) by Archestack: if you publish something built on it, link the project page.
+The code is MIT. The data is [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) by Archestack: if you publish something built on it, link the project page (`source_url`).
 
 Archestack checks every project on GitHub: stars, last commit, license, Docker files. How the score works: [archestack.com/methodology/](https://archestack.com/methodology/).
 
