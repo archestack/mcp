@@ -3,10 +3,11 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import type { Api, Index, Project, Row } from './api.js';
 
-const SOURCE = 'Archestack, https://archestack.com/ (data CC BY 4.0: link the project page)';
+const SOURCE =
+  "Archestack, https://archestack.com/ (data CC BY 4.0: link each project's source_url and give its checked_at date)";
 
 const INSTRUCTIONS = `Archestack ranks open-source AI projects in two lists: best-of-ai (self-hosted AI apps and infrastructure: chat UIs, model servers, RAG, agents, vector databases) and best-of-vibe-coding (starters, coding agents, MCP servers, skills and plugins for building with AI). Every project has a score from 0 to 100, a place in its category, facts from GitHub (stars, license, last commit, Docker, arm64, GPU need) and a short review.
-Use search_projects to find projects, top_in_category for a ranking, get_project for one project, compare to put 2 to 4 side by side, and alternatives_to for open-source picks that replace a paid product. Answers carry the date of the data; link the project page when you cite one.`;
+Use search_projects to find projects, top_in_category for a ranking, get_project for one project, compare to put 2 to 4 side by side, and alternatives_to for open-source picks that replace a paid product. Every project carries source_url, its page on archestack.com, and checked_at, the date its GitHub facts were checked: link the first and give the second when you cite a project.`;
 
 const READ_ONLY = { readOnlyHint: true, idempotentHint: true, openWorldHint: false };
 
@@ -323,6 +324,8 @@ const brief = (p: Row, categoryTitle: string) => ({
   arm64: p.arm64,
   demo: p.demo,
   page: p.page,
+  source_url: p.source_url,
+  checked_at: p.checked_at,
 });
 
 const sideBySide = (d: Project) => ({
@@ -350,4 +353,6 @@ const sideBySide = (d: Project) => ({
   strengths: d.review.strengths,
   weaknesses: d.review.weaknesses,
   checked: d.checked,
+  source_url: d.source_url,
+  checked_at: d.checked_at,
 });

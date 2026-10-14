@@ -167,6 +167,24 @@ describe('archestack-mcp over stdio', () => {
     assert.equal(failOnce.size, 0);
   });
 
+  it('every tool gives each project its source_url and checked_at', async () => {
+    const answers = await Promise.all([
+      answer('search_projects', { query: 'vector database', limit: 5 }).then((b) => b.results),
+      answer('get_project', { project: 'Qdrant' }).then((b) => [b]),
+      answer('top_in_category', { category: 'vector-db', limit: 5 }).then((b) => b.projects),
+      answer('compare', { projects: ['Open WebUI', 'librechat'] }).then((b) => b.projects),
+      answer('alternatives_to', { product: 'Cursor' }).then((b) => b.picks),
+    ]);
+    for (const projects of answers) {
+      assert.ok(projects.length > 0);
+      for (const p of projects as { id: string; source_url: string; checked_at: string }[]) {
+        const [list, id] = p.id.split('/');
+        assert.equal(p.source_url, `https://archestack.com/${list}/projects/${id}/`);
+        assert.match(p.checked_at, /^\d{4}-\d{2}-\d{2}$/);
+      }
+    }
+  });
+
   it('refuses a document that does not match the published schema', async () => {
     replace.set('projects/best-of-ai/chroma.json', { id: 'best-of-ai/chroma', score: 'high' });
     const { isError, text } = await call('get_project', { project: 'best-of-ai/chroma' });

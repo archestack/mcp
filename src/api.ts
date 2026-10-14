@@ -22,6 +22,8 @@ export interface Ref {
   place: number;
   score: number;
   tagline: string;
+  source_url?: string; // the page to link when citing (API 2026-10-14; absent in older copies)
+  checked_at?: string | null; // date of the GitHub check; null when the latest check missed it
 }
 
 export interface Index {
@@ -93,6 +95,8 @@ export interface Project {
   links: { demo: string | null; docs: string | null; website: string | null };
   review: { audience: string; strengths: string[]; weaknesses: string[] };
   checked: string;
+  source_url?: string;
+  checked_at?: string | null;
 }
 
 export interface Alternative {
