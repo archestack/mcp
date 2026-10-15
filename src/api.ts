@@ -6,7 +6,7 @@ import ky from 'ky';
 export const DEFAULT_API_URL = 'https://archestack.com/api/v1/';
 const HOUR_MS = 60 * 60 * 1000;
 
-type SchemaName = 'index' | 'projects' | 'category' | 'project' | 'alternative';
+type SchemaName = 'index' | 'projects' | 'category' | 'project' | 'alternative' | 'allowlist';
 type Gpu = 'none' | 'optional' | 'required' | 'unknown';
 
 export interface Ref {
@@ -101,6 +101,29 @@ export interface Project {
   checked_at?: string | null;
 }
 
+// MCP servers that passed every applicable Archestack safety check (API 2026-10-15).
+export interface AllowlistServer {
+  id: string;
+  name: string;
+  repo: string;
+  registry_name: string; // the server's name in the official MCP Registry
+  packages: { registry: 'npm' | 'pypi'; name: string; version: string; integrity: string | null }[];
+  checked: string;
+  commit: string;
+  content_hash: string | null;
+  passed: number;
+  applicable: number;
+  url: string;
+  source_url: string;
+  checked_at: string | null;
+}
+
+export interface Allowlist {
+  updated: string;
+  rule: string;
+  servers: AllowlistServer[];
+}
+
 // Upkeep and security facts (API 2026-10-12); every part is null when it was not checked.
 export interface Health {
   releases_12m: number | null;
@@ -177,6 +200,7 @@ export function createApi(baseUrl: string, version: string, compile?: Compile) {
     category: (url: string) => doc<Category>('category', pathOf(url)),
     project: (url: string) => doc<Project>('project', pathOf(url)),
     alternative: (url: string) => doc<Alternative>('alternative', pathOf(url)),
+    allowlist: () => doc<Allowlist>('allowlist', 'allowlist.json'),
   };
 }
 

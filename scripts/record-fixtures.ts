@@ -6,7 +6,10 @@ const base = process.env.ARCHESTACK_API_URL ?? 'https://archestack.com/api/v1/';
 const paths = [
   'index.json',
   'projects.json',
-  ...['index', 'projects', 'category', 'project', 'alternative'].map((n) => `schema/${n}.json`),
+  'allowlist.json',
+  ...['index', 'projects', 'category', 'project', 'alternative', 'allowlist'].map(
+    (n) => `schema/${n}.json`,
+  ),
   'categories/best-of-ai/vector-db.json',
   'projects/best-of-ai/qdrant.json',
   'projects/best-of-ai/open-webui.json',

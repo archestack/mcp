@@ -35,10 +35,18 @@ const replace = new Map<string, unknown>(); // paths that answer this body inste
 
 let api: Server;
 let apiUrl: string;
+let registryUrl: string;
 let client: Client;
 
 before(async () => {
   api = createServer(async (req, res) => {
+    // The official MCP Registry's record of one version: /v0.1/servers/{name}/versions/{version}.
+    const official = (req.url ?? '').match(/^\/v0\.1\/servers\/([^/]+)\/versions\/([^/]+)$/);
+    if (official) {
+      const file = `${decodeURIComponent(official[1]!).replace('/', '__')}@${official[2]}.json`;
+      const body = await readFile(new URL(`registry/${file}`, fixtures), 'utf8').catch(() => null);
+      return void (body === null ? res.writeHead(404).end() : res.writeHead(200).end(body));
+    }
     const path = (req.url ?? '').replace(/^\/api\/v1\//, '');
     if (failOnce.delete(path)) return void res.writeHead(503).end();
     const body = replace.has(path)
@@ -50,6 +58,7 @@ before(async () => {
   await new Promise<void>((done) => api.listen(0, '127.0.0.1', done));
   const { port } = api.address() as AddressInfo;
   apiUrl = `http://127.0.0.1:${port}/api/v1/`;
+  registryUrl = `http://127.0.0.1:${port}/`;
   client = new Client({ name: 'test', version: '1.0.0' });
   await client.connect(
     new StdioClientTransport({
@@ -220,7 +229,11 @@ describe('archestack-mcp over stdio', () => {
 describe('remote server over HTTP', () => {
   let limited = false;
   const handle = (request: Request) =>
-    createHttpHandler(createApi(apiUrl, '0.0.0-test'), '0.0.0-test')(request, {
+    createHttpHandler(
+      createApi(apiUrl, '0.0.0-test'),
+      '0.0.0-test',
+      registryUrl,
+    )(request, {
       limiter: { limit: async () => ({ success: !limited }) },
       openaiChallenge: 'token-123',
     });
@@ -287,5 +300,56 @@ describe('remote server over HTTP', () => {
     const res = await handle(new Request('https://mcp.test/.well-known/openai-apps-challenge'));
     assert.equal(res.status, 200);
     assert.equal(await res.text(), 'token-123');
+  });
+
+  it('serves the allowlist as a v0.1 MCP registry, each entry the official record of the checked version', async () => {
+    const list = await handle(new Request('https://mcp.test/registry/v0.1/servers'));
+    assert.equal(list.status, 200);
+    assert.equal(list.headers.get('access-control-allow-origin'), '*');
+    const { servers, metadata } = await list.json();
+    assert.equal(metadata.count, servers.length);
+    const names = servers.map((e: { server: { name: string } }) => e.server.name);
+    assert.deepEqual(names.sort(), [
+      'io.github.ChromeDevTools/chrome-devtools-mcp',
+      'io.github.yamadashy/repomix',
+    ]);
+    const one = await handle(
+      new Request(
+        'https://mcp.test/registry/v0.1/servers/io.github.yamadashy%2Frepomix/versions/latest',
+      ),
+    );
+    const entry = await one.json();
+    assert.equal(entry.server.version, '1.18.1');
+    assert.equal(
+      entry._meta['com.archestack/safety'].passed,
+      entry._meta['com.archestack/safety'].applicable,
+    );
+    const missing = await handle(
+      new Request(
+        'https://mcp.test/registry/v0.1/servers/io.github.yamadashy%2Frepomix/versions/0.0.1',
+      ),
+    );
+    assert.equal(missing.status, 404);
+  });
+
+  it('gives Claude Code a managed-mcp.json and an allowlist with the same pinned commands', async () => {
+    const managed = await (
+      await handle(new Request('https://mcp.test/allowlist/claude/managed-mcp.json'))
+    ).json();
+    assert.deepEqual(managed.mcpServers.repomix, {
+      type: 'stdio',
+      command: 'npx',
+      args: ['-y', 'repomix@1.18.1', '--mcp'],
+    });
+    const settings = await (
+      await handle(new Request('https://mcp.test/allowlist/claude/managed-settings.json'))
+    ).json();
+    assert.equal(settings.allowManagedMcpServersOnly, true);
+    assert.deepEqual(
+      settings.allowedMcpServers.map((e: { serverCommand: string[] }) => e.serverCommand).sort(),
+      Object.values(managed.mcpServers as Record<string, { command: string; args: string[] }>)
+        .map((m) => [m.command, ...m.args])
+        .sort(),
+    );
   });
 });

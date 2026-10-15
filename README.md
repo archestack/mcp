@@ -21,6 +21,14 @@ It reads the [open data API](https://archestack.com/api/). No key, no account. R
 
 It runs on Cloudflare's free Workers plan, so it allows 120 requests a minute per address and can run out of requests late in a busy day (UTC). It keeps no logs of your questions: [privacy](https://archestack.com/privacy/). For heavy use, run the npm package below.
 
+## Safety allowlist for admins
+
+The hosted server also serves Archestack's [safety checks](https://archestack.com/methodology/#safety-checks) as allowlists: MCP servers whose latest run passed every applicable check, pinned to the package version that was read, each with the official MCP Registry's record of that version.
+
+- **GitHub Copilot** ("Registry only" policy): MCP Registry URL `https://mcp.archestack.com/registry` (v0.1 API: `/v0.1/servers`, `/v0.1/servers/{name}/versions/{version}`).
+- **Claude Code**: [`managed-mcp.json`](https://mcp.archestack.com/allowlist/claude/managed-mcp.json) for a fixed set, or [`allowedMcpServers`](https://mcp.archestack.com/allowlist/claude/managed-settings.json) for managed settings.
+- The data: [`/api/v1/allowlist.json`](https://archestack.com/api/v1/allowlist.json). A check result is a fact about what was read on that date, not a guarantee.
+
 ## Install
 
 Needs Node.js 22 or newer. One click for Cursor or VS Code:

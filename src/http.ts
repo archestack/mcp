@@ -4,6 +4,7 @@
 // handshake (initialize, then calls), the latter statelessly, one fresh server per request.
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import type { Api } from './api.js';
+import { claudeResponse, createRegistry, registryResponse, type Registry } from './registry.js';
 import { createServer } from './server.js';
 
 // Cloudflare's rate limiting binding: a count per key per minute in each location.
@@ -30,24 +31,41 @@ export interface Options {
   openaiChallenge?: string | undefined;
 }
 
-export function createHttpHandler(api: Api, version: string) {
+export function createHttpHandler(api: Api, version: string, officialRegistry?: string) {
   const mcp = createMcpHandler(() => createServer(api, version), { maxRequestBodySize: MAX_BODY });
+  const registry = createRegistry(api, officialRegistry);
 
   return async (
     request: Request,
     { limiter, openaiChallenge }: Options = {},
   ): Promise<Response> => {
-    const { pathname } = new URL(request.url);
+    const url = new URL(request.url);
+    const { pathname } = url;
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     if (pathname === '/' && request.method === 'GET') return Response.redirect(DOCS, 302);
     if (pathname === '/health') return text(200, `ok ${version}`);
     if (pathname === '/.well-known/openai-apps-challenge' && openaiChallenge) {
       return text(200, openaiChallenge);
     }
-    if (pathname !== '/mcp') return text(404, `Not found. The MCP endpoint is /mcp, docs: ${DOCS}`);
+    const lists = pathname.startsWith('/registry/') || pathname.startsWith('/allowlist/');
+    if (pathname !== '/mcp' && !lists) {
+      return text(404, `Not found. The MCP endpoint is /mcp, docs: ${DOCS}`);
+    }
     if (limiter && !(await allowed(request, limiter))) return tooMany();
-    return withCors(await mcp.fetch(request));
+    if (!lists) return withCors(await mcp.fetch(request));
+    if (request.method !== 'GET' && request.method !== 'HEAD') return text(405, 'GET only');
+    const answer = await allowlistAnswer(registry, url);
+    return answer ? withCors(answer) : text(404, `Not found. Docs: ${DOCS}`);
   };
+}
+
+// A registry or Claude Code file; 503 when the Archestack API or the MCP Registry does not answer.
+async function allowlistAnswer(registry: Registry, url: URL) {
+  try {
+    return (await registryResponse(registry, url)) ?? (await claudeResponse(registry, url));
+  } catch {
+    return text(503, 'The allowlist could not be read just now. Try again in a minute.');
+  }
 }
 
 // One count per client address, so one busy client cannot use up the day's free requests.
