@@ -24,14 +24,26 @@ const CORS = {
   'access-control-max-age': '86400',
 };
 
+// What the ChatGPT plugin portal asks the MCP host to serve to prove it is ours (a public token).
+export interface Options {
+  limiter?: Limiter | undefined;
+  openaiChallenge?: string | undefined;
+}
+
 export function createHttpHandler(api: Api, version: string) {
   const mcp = createMcpHandler(() => createServer(api, version), { maxRequestBodySize: MAX_BODY });
 
-  return async (request: Request, limiter?: Limiter): Promise<Response> => {
+  return async (
+    request: Request,
+    { limiter, openaiChallenge }: Options = {},
+  ): Promise<Response> => {
     const { pathname } = new URL(request.url);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     if (pathname === '/' && request.method === 'GET') return Response.redirect(DOCS, 302);
     if (pathname === '/health') return text(200, `ok ${version}`);
+    if (pathname === '/.well-known/openai-apps-challenge' && openaiChallenge) {
+      return text(200, openaiChallenge);
+    }
     if (pathname !== '/mcp') return text(404, `Not found. The MCP endpoint is /mcp, docs: ${DOCS}`);
     if (limiter && !(await allowed(request, limiter))) return tooMany();
     return withCors(await mcp.fetch(request));

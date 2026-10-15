@@ -221,7 +221,8 @@ describe('remote server over HTTP', () => {
   let limited = false;
   const handle = (request: Request) =>
     createHttpHandler(createApi(apiUrl, '0.0.0-test'), '0.0.0-test')(request, {
-      limit: async () => ({ success: !limited }),
+      limiter: { limit: async () => ({ success: !limited }) },
+      openaiChallenge: 'token-123',
     });
   const endpoint = new URL('https://mcp.test/mcp');
   const post = (body: object, headers: Record<string, string> = {}) =>
@@ -280,5 +281,11 @@ describe('remote server over HTTP', () => {
     const res = await handle(new Request('https://mcp.test/'));
     assert.equal(res.status, 302);
     assert.equal(res.headers.get('location'), 'https://archestack.com/api/#mcp');
+  });
+
+  it('serves the ChatGPT domain challenge as the bare token', async () => {
+    const res = await handle(new Request('https://mcp.test/.well-known/openai-apps-challenge'));
+    assert.equal(res.status, 200);
+    assert.equal(await res.text(), 'token-123');
   });
 });
