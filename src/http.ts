@@ -1,0 +1,68 @@
+// The remote server: MCP over streamable HTTP at /mcp, for clients that take a URL instead of a
+// command (Claude and ChatGPT connectors, the MCP Inspector). Read-only, no accounts, no cookies,
+// nothing stored. Both protocol eras are served: 2026-07-28 per-request calls and the 2025
+// handshake (initialize, then calls), the latter statelessly, one fresh server per request.
+import { createMcpHandler } from '@modelcontextprotocol/server';
+import type { Api } from './api.js';
+import { createServer } from './server.js';
+
+// Cloudflare's rate limiting binding: a count per key per minute in each location.
+export interface Limiter {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
+}
+
+const DOCS = 'https://archestack.com/api/#mcp';
+const MAX_BODY = 64 * 1024; // the largest tool call is a few hundred bytes
+
+// Any web page may call it: there is no login or cookie to steal, and the data is public.
+const CORS = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
+  'access-control-allow-headers':
+    'content-type, accept, authorization, mcp-protocol-version, mcp-session-id, last-event-id',
+  'access-control-expose-headers': 'mcp-session-id, mcp-protocol-version',
+  'access-control-max-age': '86400',
+};
+
+export function createHttpHandler(api: Api, version: string) {
+  const mcp = createMcpHandler(() => createServer(api, version), { maxRequestBodySize: MAX_BODY });
+
+  return async (request: Request, limiter?: Limiter): Promise<Response> => {
+    const { pathname } = new URL(request.url);
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+    if (pathname === '/' && request.method === 'GET') return Response.redirect(DOCS, 302);
+    if (pathname === '/health') return text(200, `ok ${version}`);
+    if (pathname !== '/mcp') return text(404, `Not found. The MCP endpoint is /mcp, docs: ${DOCS}`);
+    if (limiter && !(await allowed(request, limiter))) return tooMany();
+    return withCors(await mcp.fetch(request));
+  };
+}
+
+// One count per client address, so one busy client cannot use up the day's free requests.
+async function allowed(request: Request, limiter: Limiter) {
+  const key = request.headers.get('cf-connecting-ip') ?? 'unknown';
+  return (await limiter.limit({ key })).success;
+}
+
+function tooMany() {
+  const body = {
+    jsonrpc: '2.0',
+    id: null,
+    error: { code: -32000, message: 'Too many requests from this address. Try again in a minute.' },
+  };
+  return withCors(
+    new Response(JSON.stringify(body), {
+      status: 429,
+      headers: { 'content-type': 'application/json', 'retry-after': '60' },
+    }),
+  );
+}
+
+const text = (status: number, body: string) =>
+  withCors(new Response(body, { status, headers: { 'content-type': 'text/plain' } }));
+
+function withCors(response: Response) {
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(CORS)) headers.set(name, value);
+  return new Response(response.body, { status: response.status, headers });
+}

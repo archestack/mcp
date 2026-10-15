@@ -9,7 +9,17 @@ It covers two lists:
 - [Best of AI](https://archestack.com/best-of-ai/): self-hosted AI apps and infrastructure, like chat UIs, model servers, RAG, agents and vector databases.
 - [Best of Vibe Coding](https://archestack.com/best-of-vibe-coding/): starters, coding agents, MCP servers, skills and plugins for building with AI.
 
-The server runs on your machine and reads the [open data API](https://archestack.com/api/). No key, no account.
+It reads the [open data API](https://archestack.com/api/). No key, no account. Run it on your machine with npm, or add the hosted server by its URL.
+
+## Hosted server
+
+`https://mcp.archestack.com/mcp`: the same tools over streamable HTTP, for apps that take a URL instead of a command. Read-only, no sign-in.
+
+- **Claude** (claude.ai and the desktop app): Settings → Connectors → Add custom connector, paste the URL.
+- **Claude Code**: `claude mcp add --transport http archestack https://mcp.archestack.com/mcp`
+- **Any client**: `{ "type": "http", "url": "https://mcp.archestack.com/mcp" }`
+
+It runs on Cloudflare's free Workers plan, so it allows 120 requests a minute per address and can run out of requests late in a busy day (UTC). It keeps no logs of your questions: [privacy](https://archestack.com/privacy/). For heavy use, run the npm package below.
 
 ## Install
 
@@ -57,11 +67,12 @@ Then point your client at `node /full/path/to/archestack-mcp/dist/index.js` inst
 | ----------------- | --------------------------------------------------------------------------------------------------------------- |
 | `search_projects` | Finds projects by words and filters: list, category, license family, runs without a GPU, arm64 build, live demo |
 | `get_project`     | One project in full: score and its parts, place in its category, GitHub facts, health, links, review            |
+| `deploy_facts`    | What it takes to run one project: Docker, arm64, GPU, RAM, outside services, port, its stated needs, upkeep      |
 | `top_in_category` | The ranking of one category, best first                                                                         |
 | `compare`         | 2 to 4 projects side by side                                                                                    |
 | `alternatives_to` | Open-source picks for a paid product, such as Cursor or ChatGPT                                                 |
 
-All five are read-only. Things to ask:
+All six are read-only. Things to ask:
 
 - "Which vector database runs without a GPU?"
 - "Open-source alternatives to Cursor"
@@ -95,7 +106,7 @@ What comes back, shortened (`search_projects` with "vector database" and `no_gpu
 ## How it works
 
 - It talks to archestack.com and nothing else. The API is static JSON served with the site. The server sends nothing about you or your questions and has no telemetry.
-- The server checks each file against the JSON Schema published next to it ([/api/v1/schema/](https://archestack.com/api/v1/schema/project.json)). If a file does not match, you get an error instead of a made-up answer.
+- The npm server checks each file against the JSON Schema published next to it ([/api/v1/schema/](https://archestack.com/api/v1/schema/project.json)). If a file does not match, you get an error instead of a made-up answer. The hosted server skips this check to stay inside the free plan's CPU time; the tests run both against the same recorded files.
 - Each request times out after 8 seconds, with two retries and backoff. The server keeps each file in memory for an hour; Archestack refreshes the data twice a day.
 - Every project in an answer carries `source_url`, its page on archestack.com, and `checked_at`, the date its facts were checked on GitHub.
 - `ARCHESTACK_API_URL` points the server at another copy of the API. The tests use it for a local one.
@@ -113,6 +124,9 @@ npm ci
 npm test           # builds, then runs the server over stdio against recorded API answers
 npm run fixtures   # records fresh answers from archestack.com into test/fixtures
 npx @modelcontextprotocol/inspector node dist/index.js   # try the tools by hand
+npx wrangler@4.141.0 dev   # the hosted server on http://localhost:8787/mcp
 ```
+
+`src/worker.ts` is the Cloudflare Worker entry (config in `wrangler.jsonc`); `npm run deploy` publishes it with `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` set.
 
 Bugs and ideas: [open an issue](https://github.com/archestack/mcp/issues).

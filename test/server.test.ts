@@ -1,6 +1,6 @@
-// The server runs the way users run it: the built bin, spawned over stdio by an MCP client. A local
-// HTTP server stands in for archestack.com and answers with recorded responses (test/fixtures,
-// refreshed with `npm run fixtures`).
+// The server runs the way users run it: the built bin spawned over stdio by an MCP client, and the
+// built HTTP handler the Worker serves. A local HTTP server stands in for archestack.com and
+// answers with recorded responses (test/fixtures, refreshed with `npm run fixtures`).
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
@@ -8,7 +8,15 @@ import type { AddressInfo } from 'node:net';
 import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/client';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import type * as ApiModule from '../src/api.js';
+import type * as HttpModule from '../src/http.js';
+
+// The built files, as the Worker bundles them (typed from their sources).
+const built = (file: string) => import(new URL(`../dist/${file}`, import.meta.url).href);
+const { createApi } = (await built('api.js')) as typeof ApiModule;
+const { createHttpHandler } = (await built('http.js')) as typeof HttpModule;
 
 const fixtures = new URL('./fixtures/', import.meta.url);
 const recorded = JSON.parse(await readFile(new URL('projects.json', fixtures), 'utf8')) as {
@@ -26,6 +34,7 @@ const failOnce = new Set<string>(); // paths that answer 503 the first time
 const replace = new Map<string, unknown>(); // paths that answer this body instead of the recording
 
 let api: Server;
+let apiUrl: string;
 let client: Client;
 
 before(async () => {
@@ -40,12 +49,13 @@ before(async () => {
   });
   await new Promise<void>((done) => api.listen(0, '127.0.0.1', done));
   const { port } = api.address() as AddressInfo;
+  apiUrl = `http://127.0.0.1:${port}/api/v1/`;
   client = new Client({ name: 'test', version: '1.0.0' });
   await client.connect(
     new StdioClientTransport({
       command: process.execPath,
       args: [fileURLToPath(new URL('../dist/index.js', import.meta.url))],
-      env: { PATH: process.env.PATH ?? '', ARCHESTACK_API_URL: `http://127.0.0.1:${port}/api/v1/` },
+      env: { PATH: process.env.PATH ?? '', ARCHESTACK_API_URL: apiUrl },
     }),
   );
 });
@@ -68,16 +78,21 @@ async function answer(name: string, args: Record<string, unknown>) {
 }
 
 describe('archestack-mcp over stdio', () => {
-  it('lists five read-only tools', async () => {
+  it('lists six read-only tools', async () => {
     const { tools } = await client.listTools();
     assert.deepEqual(tools.map((t) => t.name).sort(), [
       'alternatives_to',
       'compare',
+      'deploy_facts',
       'get_project',
       'search_projects',
       'top_in_category',
     ]);
-    assert.ok(tools.every((t) => t.annotations?.readOnlyHint === true));
+    assert.ok(
+      tools.every(
+        (t) => t.annotations?.readOnlyHint === true && t.annotations.destructiveHint === false,
+      ),
+    );
   });
 
   it('search_projects ranks word matches and keeps to the GPU filter', async () => {
@@ -131,6 +146,15 @@ describe('archestack-mcp over stdio', () => {
     const { isError, text } = await call('get_project', { project: 'qdran' });
     assert.equal(isError, true);
     assert.match(text, /No project "qdran".*best-of-ai\/qdrant/);
+  });
+
+  it('deploy_facts gives what it takes to run a project, and null for what is not known', async () => {
+    const body = await answer('deploy_facts', { project: 'Open WebUI' });
+    assert.equal(body.id, 'best-of-ai/open-webui');
+    assert.equal(typeof body.docker, 'boolean');
+    assert.ok(Array.isArray(body.needs) && body.needs.length > 0);
+    assert.ok('ram_min_gb' in body && 'web_port' in body && 'releases_12m' in body);
+    assert.match(body.source_url, /^https:\/\/archestack\.com\//);
   });
 
   it('top_in_category takes a category title and a limit', async () => {
@@ -190,5 +214,71 @@ describe('archestack-mcp over stdio', () => {
     const { isError, text } = await call('get_project', { project: 'best-of-ai/chroma' });
     assert.equal(isError, true);
     assert.match(text, /does not match the published project schema/);
+  });
+});
+
+describe('remote server over HTTP', () => {
+  let limited = false;
+  const handle = (request: Request) =>
+    createHttpHandler(createApi(apiUrl, '0.0.0-test'), '0.0.0-test')(request, {
+      limit: async () => ({ success: !limited }),
+    });
+  const endpoint = new URL('https://mcp.test/mcp');
+  const post = (body: object, headers: Record<string, string> = {}) =>
+    handle(
+      new Request(endpoint, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
+          ...headers,
+        },
+        body: JSON.stringify(body),
+      }),
+    );
+
+  it('answers an MCP client: list tools, then call one', async () => {
+    const remote = new Client({ name: 'test', version: '1.0.0' });
+    await remote.connect(
+      new StreamableHTTPClientTransport(endpoint, {
+        fetch: (url, init) => handle(new Request(url, init)),
+      }),
+    );
+    const { tools } = await remote.listTools();
+    assert.equal(tools.length, 6);
+    const result = await remote.callTool({ name: 'get_project', arguments: { project: 'Qdrant' } });
+    const [first] = result.content as { text: string }[];
+    assert.equal(JSON.parse(first!.text).id, 'best-of-ai/qdrant');
+    await remote.close();
+  });
+
+  it('answers the 2025 handshake a plain HTTP client sends', async () => {
+    const res = await post({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2025-06-18',
+        capabilities: {},
+        clientInfo: { name: 'curl', version: '1' },
+      },
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('access-control-allow-origin'), '*');
+    assert.match(await res.text(), /"serverInfo":\{"name":"archestack"/);
+  });
+
+  it('turns a client away with 429 past the rate limit', async () => {
+    limited = true;
+    const res = await post({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
+    limited = false;
+    assert.equal(res.status, 429);
+    assert.equal(res.headers.get('retry-after'), '60');
+  });
+
+  it('sends people who open the bare address to the docs', async () => {
+    const res = await handle(new Request('https://mcp.test/'));
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get('location'), 'https://archestack.com/api/#mcp');
   });
 });

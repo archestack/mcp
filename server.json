@@ -8,15 +8,21 @@
     "source": "github"
   },
   "websiteUrl": "https://archestack.com/api/",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@archestack/mcp",
-      "version": "0.1.5",
+      "version": "0.2.0",
       "transport": {
         "type": "stdio"
       }
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.archestack.com/mcp"
     }
   ]
 }

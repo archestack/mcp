@@ -1,0 +1,17 @@
+// The remote server on Cloudflare Workers (free plan): `npm run deploy` with CLOUDFLARE_API_TOKEN
+// and CLOUDFLARE_ACCOUNT_ID set. The free plan has no usage billing: past 100,000 requests a day
+// the endpoint answers an error until midnight UTC.
+{
+  "name": "archestack-mcp",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "mcp.archestack.com", "custom_domain": true }],
+  // 120 MCP requests a minute per client address in each Cloudflare location.
+  "ratelimits": [
+    { "name": "LIMIT", "namespace_id": "4201", "simple": { "limit": 120, "period": 60 } },
+  ],
+  // No request logs are kept (see https://archestack.com/privacy/).
+  "observability": { "enabled": false },
+}
