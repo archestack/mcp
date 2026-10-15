@@ -1,6 +1,6 @@
 {
   "name": "@archestack/mcp",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "MCP server for Archestack: search, rank and compare open-source AI projects from archestack.com's open data",
   "mcpName": "io.github.archestack/mcp",
   "license": "MIT",
@@ -50,7 +50,9 @@
     "lint": "eslint . && prettier --check src test scripts",
     "test": "npm run build && node --test test/*.test.ts",
     "fixtures": "node scripts/record-fixtures.ts",
-    "prepublishOnly": "npm run lint && npm run typecheck && npm test"
+    "prepublishOnly": "npm run lint && npm run typecheck && npm test",
+    "deploy": "npx -y wrangler@4.141.0 deploy",
+    "check:worker": "npx -y wrangler@4.141.0 deploy --dry-run --outdir .wrangler/dry-run"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.2.0",

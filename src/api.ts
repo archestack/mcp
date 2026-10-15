@@ -1,12 +1,7 @@
 // Reads the Archestack open data API: static JSON files under https://archestack.com/api/v1/.
-// Every document is checked against the JSON Schema the site publishes next to it
-// (/api/v1/schema/<name>.json) and kept in memory for an hour.
+// Each document is kept in memory for an hour. Given a schema compiler, every document is first
+// checked against the JSON Schema the site publishes next to it (/api/v1/schema/<name>.json).
 import ky from 'ky';
-import {
-  Ajv,
-  AjvJsonSchemaValidator,
-  addFormats,
-} from '@modelcontextprotocol/server/validators/ajv';
 
 export const DEFAULT_API_URL = 'https://archestack.com/api/v1/';
 const HOUR_MS = 60 * 60 * 1000;
@@ -91,12 +86,34 @@ export interface Project {
     gpu: Gpu;
     ram_min_gb: number | null;
     external_deps: string[];
+    web_port?: number | null;
   };
   links: { demo: string | null; docs: string | null; website: string | null };
-  review: { audience: string; strengths: string[]; weaknesses: string[] };
+  review: {
+    audience: string;
+    strengths: string[];
+    weaknesses: string[];
+    needs?: string[]; // what it takes to run, from its README (Docker, models, port...)
+  };
+  health?: Health | null;
   checked: string;
   source_url?: string;
   checked_at?: string | null;
+}
+
+// Upkeep and security facts (API 2026-10-12); every part is null when it was not checked.
+export interface Health {
+  releases_12m: number | null;
+  days_since_release: number | null;
+  advisories: { published_12m: number; critical_high: number; url: string } | null;
+  package: {
+    registry: string;
+    name: string;
+    version: string;
+    advisories: string[]; // OSV ids deps.dev lists for that version
+    url: string;
+  } | null;
+  sources_checked: string | null;
 }
 
 export interface Alternative {
@@ -110,7 +127,14 @@ export interface Alternative {
 
 export type Api = ReturnType<typeof createApi>;
 
-export function createApi(baseUrl: string, version: string) {
+// Turns a published JSON Schema into a check; `data` is the document as the schema keeps it.
+export type Compile = (
+  schema: object,
+) => (input: unknown) => { valid: boolean; data?: unknown; errorMessage?: string };
+
+// Without `compile` documents are trusted as served: the remote server (src/worker.ts) skips the
+// check because validating projects.json alone costs more CPU than a free Worker request gets.
+export function createApi(baseUrl: string, version: string, compile?: Compile) {
   const http = ky.create({
     prefix: baseUrl,
     timeout: 8_000,
@@ -129,14 +153,15 @@ export function createApi(baseUrl: string, version: string) {
     return value;
   }
 
-  const validator = (name: SchemaName) =>
+  const validator = (name: SchemaName, check: Compile) =>
     cached(`schema/${name}.json`, async () =>
-      compile(await http.get(`schema/${name}.json`).json<object>()),
+      check(await http.get(`schema/${name}.json`).json<object>()),
     );
 
   const doc = <T>(name: SchemaName, path: string) =>
     cached(path, async () => {
-      const [validate, data] = await Promise.all([validator(name), http.get(path).json()]);
+      if (!compile) return http.get(path).json<T>();
+      const [validate, data] = await Promise.all([validator(name, compile), http.get(path).json()]);
       const result = validate(data);
       if (!result.valid) {
         throw new Error(
@@ -153,19 +178,6 @@ export function createApi(baseUrl: string, version: string) {
     project: (url: string) => doc<Project>('project', pathOf(url)),
     alternative: (url: string) => doc<Alternative>('alternative', pathOf(url)),
   };
-}
-
-// A fresh engine per schema version, so hourly refetches do not pile up compiled schemas. The
-// schemas use no keyword newer than draft-07. removeAdditional drops fields newer than a cached
-// schema instead of failing: v1 only ever adds fields.
-function compile(schema: object) {
-  const ajv = new Ajv({
-    strict: false,
-    validateSchema: false,
-    allErrors: true,
-    removeAdditional: true,
-  });
-  return new AjvJsonSchemaValidator(addFormats(ajv)).getValidator<unknown>(schema);
 }
 
 // Documents link each other with absolute archestack.com URLs; requests follow them under the

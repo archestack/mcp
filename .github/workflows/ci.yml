@@ -29,3 +29,6 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      - name: the Worker bundles (hosted server)
+        if: matrix.node == 24
+        run: npm run check:worker
