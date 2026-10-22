@@ -87,10 +87,11 @@ async function answer(name: string, args: Record<string, unknown>) {
 }
 
 describe('archestack-mcp over stdio', () => {
-  it('lists six read-only tools', async () => {
+  it('lists seven read-only tools', async () => {
     const { tools } = await client.listTools();
     assert.deepEqual(tools.map((t) => t.name).sort(), [
       'alternatives_to',
+      'check_repo',
       'compare',
       'deploy_facts',
       'get_project',
@@ -155,6 +156,43 @@ describe('archestack-mcp over stdio', () => {
     const { isError, text } = await call('get_project', { project: 'qdran' });
     assert.equal(isError, true);
     assert.match(text, /No project "qdran".*best-of-ai\/qdrant/);
+  });
+
+  it('check_repo gives license, upkeep, failed safety checks and higher-ranked picks', async () => {
+    const body = await answer('check_repo', {
+      repo: 'https://github.com/ruvnet/ruflo/tree/main/v3',
+    });
+    const row = recorded.projects.find((p) => p.id === 'best-of-vibe-coding/ruflo')!;
+    assert.equal(body.listed, true);
+    assert.equal(body.id, row.id);
+    assert.equal(body.safety.all_pass, false);
+    assert.ok(body.safety.failed.length > 0);
+    assert.ok(body.safety.failed.every((c: { evidence: string[] }) => Array.isArray(c.evidence)));
+    assert.ok(body.safety.passed < body.safety.applicable);
+    assert.match(body.safety.details, /#safety-checks$/);
+    const places = body.ranked_higher.map((p: { place: number }) => p.place);
+    assert.equal(places.length, 3);
+    assert.deepEqual(
+      places,
+      [...places].sort((a: number, b: number) => a - b),
+    );
+    const same = new Set(
+      recorded.projects.filter((p) => p.category === row.category).map((p) => p.id),
+    );
+    assert.ok(body.ranked_higher.every((p: { id: string }) => same.has(p.id)));
+  });
+
+  it('check_repo reads owner/repo and a .git link; a repo it does not list gets a suggest link', async () => {
+    const clean = await answer('check_repo', { repo: 'github.com/yamadashy/repomix.git' });
+    assert.equal(clean.safety.all_pass, true);
+    assert.deepEqual(clean.safety.failed, []);
+    const unlisted = await answer('check_repo', { repo: 'sindresorhus/ky' });
+    assert.equal(unlisted.listed, false);
+    assert.equal(unlisted.repo, 'sindresorhus/ky');
+    assert.match(unlisted.suggest, /^https:\/\/github\.com\/archestack\//);
+    const { isError, text } = await call('check_repo', { repo: 'not a repo' });
+    assert.equal(isError, true);
+    assert.match(text, /not a GitHub repo/);
   });
 
   it('deploy_facts gives what it takes to run a project, and null for what is not known', async () => {
@@ -259,7 +297,7 @@ describe('remote server over HTTP', () => {
       }),
     );
     const { tools } = await remote.listTools();
-    assert.equal(tools.length, 6);
+    assert.equal(tools.length, 7);
     const result = await remote.callTool({ name: 'get_project', arguments: { project: 'Qdrant' } });
     const [first] = result.content as { text: string }[];
     assert.equal(JSON.parse(first!.text).id, 'best-of-ai/qdrant');

@@ -14,6 +14,8 @@ const paths = [
   'projects/best-of-ai/qdrant.json',
   'projects/best-of-ai/open-webui.json',
   'projects/best-of-ai/librechat.json',
+  'projects/best-of-vibe-coding/ruflo.json',
+  'projects/best-of-vibe-coding/repomix.json',
   'alternatives/cursor.json',
 ];
 
