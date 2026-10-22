@@ -78,14 +78,16 @@ Then point your client at `node /full/path/to/archestack-mcp/dist/index.js` inst
 | `deploy_facts`    | What it takes to run one project: Docker, arm64, GPU, RAM, outside services, port, its stated needs, upkeep      |
 | `top_in_category` | The ranking of one category, best first                                                                         |
 | `compare`         | 2 to 4 projects side by side                                                                                    |
+| `check_repo`      | Before you install a GitHub repo: listed or not, license, upkeep, safety checks passed and failed, higher picks |
 | `alternatives_to` | Open-source picks for a paid product, such as Cursor or ChatGPT                                                 |
 
-All six are read-only. Things to ask:
+All seven are read-only. Things to ask:
 
 - "Which vector database runs without a GPU?"
 - "Open-source alternatives to Cursor"
 - "Compare Open WebUI and LibreChat"
 - "Top 5 coding agents with an arm64 build"
+- "Check github.com/ruvnet/ruflo before I install it"
 
 What comes back, shortened (`search_projects` with "vector database" and `no_gpu`, data of 2026-10-13):
 

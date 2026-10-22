@@ -1,4 +1,4 @@
-// The MCP server: six read-only tools over the Archestack open data API.
+// The MCP server: seven read-only tools over the Archestack open data API.
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import type { Api, Index, Project, Row } from './api.js';
@@ -7,7 +7,7 @@ const SOURCE =
   "Archestack, https://archestack.com/ (data CC BY 4.0: link each project's source_url and give its checked_at date)";
 
 const INSTRUCTIONS = `Archestack ranks open-source AI projects in two lists: best-of-ai (self-hosted AI apps and infrastructure: chat UIs, model servers, RAG, agents, vector databases) and best-of-vibe-coding (starters, coding agents, MCP servers, skills and plugins for building with AI). Every project has a score from 0 to 100, a place in its category, facts from GitHub (stars, license, last commit, Docker, arm64, GPU need) and a short review.
-Use search_projects to find projects, top_in_category for a ranking, get_project for one project, deploy_facts for what it takes to run one, compare to put 2 to 4 side by side, and alternatives_to for open-source picks that replace a paid product. Every project carries source_url, its page on archestack.com, and checked_at, the date its GitHub facts were checked: link the first and give the second when you cite a project.`;
+Use search_projects to find projects, top_in_category for a ranking, get_project for one project, deploy_facts for what it takes to run one, compare to put 2 to 4 side by side, check_repo before installing an MCP server, skill or plugin from a GitHub link, and alternatives_to for open-source picks that replace a paid product. Every project carries source_url, its page on archestack.com, and checked_at, the date its GitHub facts were checked: link the first and give the second when you cite a project.`;
 
 // Every tool only reads published data. openWorldHint is false: answers come from Archestack's
 // own dataset, not from the open web.
@@ -134,6 +134,24 @@ export function createServer(api: Api, version: string) {
   );
 
   server.registerTool(
+    'check_repo',
+    {
+      title: 'Check a repo before installing it',
+      description:
+        'Check a GitHub repo before installing it, most useful for an MCP server, skill or plugin: whether Archestack lists it, its license in plain words, upkeep, the safety checks it passed (with the failed ones and their evidence) and up to 3 higher-ranked projects in its category. "Checks passed" means those checks passed, not that the code is safe. A repo Archestack does not list returns listed: false and a link to suggest it.',
+      inputSchema: z.object({
+        repo: z
+          .string()
+          .min(3)
+          .max(200)
+          .describe('GitHub link or owner/repo, e.g. "https://github.com/ruvnet/ruflo"'),
+      }),
+      annotations: READ_ONLY,
+    },
+    async ({ repo }) => reply(await checkRepo(api, repo)),
+  );
+
+  server.registerTool(
     'alternatives_to',
     {
       title: 'Open-source alternatives',
@@ -232,6 +250,83 @@ async function compareProjects(api: Api, refs: string[]) {
   const rows = refs.map((ref) => findProject(projects, ref));
   const docs = await Promise.all(rows.map((p) => api.project(p.url)));
   return { projects: docs.map(sideBySide), source: SOURCE };
+}
+
+const SUGGEST = 'https://github.com/archestack/best-of-vibe-coding/issues/new?template=add-app.yml';
+
+async function checkRepo(api: Api, ref: string) {
+  const repo = repoOf(ref);
+  const { projects } = await api.projects();
+  const row = projects.find((p) => p.repo.toLowerCase() === repo.toLowerCase());
+  if (!row) {
+    return {
+      listed: false,
+      repo,
+      note: 'Not on Archestack, so no safety checks and no ranking yet. Suggest it and it gets both once it is in.',
+      suggest: SUGGEST,
+      source: SOURCE,
+    };
+  }
+  const d = await api.project(row.url);
+  const s = d.safety ?? null;
+  const higher = projects
+    .filter((p) => p.list === row.list && p.category === row.category && p.place < row.place)
+    .sort((a, b) => a.place - b.place)
+    .slice(0, 3);
+  return {
+    listed: true,
+    id: d.id,
+    name: d.name,
+    repo: d.repo,
+    page: d.page,
+    category: `${d.list}/${d.category.id} (${d.category.title})`,
+    place: `${d.place} of ${d.of}`,
+    score: d.score,
+    license: d.facts.license_words,
+    last_commit: d.facts.last_commit,
+    last_release: d.facts.last_release,
+    releases_12m: d.health?.releases_12m ?? null,
+    advisories_12m: d.health?.advisories ?? null,
+    package: d.health?.package ?? null,
+    safety: s && {
+      checked: s.checked,
+      commit: s.commit,
+      passed: s.passed,
+      applicable: s.applicable,
+      all_pass: s.all_pass,
+      failed: s.checks
+        .filter((c) => c.status === 'fail')
+        .map(({ id, title, note, evidence }) => ({ id, title, note, evidence })),
+      last_change: s.last_change?.text ?? null,
+      details: `${d.page}#safety-checks`,
+    },
+    ranked_higher: higher.map((p) => ({
+      id: p.id,
+      name: p.name,
+      repo: p.repo,
+      place: p.place,
+      score: p.score,
+      tagline: p.tagline,
+      page: p.page,
+    })),
+    checked: d.checked,
+    source_url: d.source_url,
+    checked_at: d.checked_at,
+    source: SOURCE,
+  };
+}
+
+// "https://github.com/o/r/tree/main/x", "github.com/o/r.git" and "o/r" all give "o/r".
+function repoOf(ref: string) {
+  const m = ref
+    .trim()
+    .replace(/^(https?:\/\/)?(www\.)?github\.com\//i, '')
+    .match(/^([\w.-]+)\/([\w.-]+?)(\.git)?(?:[/?#].*)?$/);
+  if (!m)
+    throw new Error(
+      `"${ref}" is not a GitHub repo. Pass a link like https://github.com/owner/repo.`,
+    );
+  return `${m[1]}/${m[2]}`;
 }
 
 async function alternativesTo(api: Api, product: string) {

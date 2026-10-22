@@ -96,6 +96,7 @@ export interface Project {
     needs?: string[]; // what it takes to run, from its README (Docker, models, port...)
   };
   health?: Health | null;
+  safety?: Safety | null;
   checked: string;
   source_url?: string;
   checked_at?: string | null;
@@ -137,6 +138,23 @@ export interface Health {
     url: string;
   } | null;
   sources_checked: string | null;
+}
+
+// Safety checks for MCP servers, skills, rules and plugins, pinned to the commit read (API 2026-10-15).
+export interface Safety {
+  checked: string;
+  commit: string;
+  passed: number;
+  applicable: number;
+  all_pass: boolean;
+  checks: {
+    id: number;
+    title: string;
+    status: 'pass' | 'fail' | 'na';
+    note: string;
+    evidence: string[];
+  }[];
+  last_change?: { date: string; text: string } | null;
 }
 
 export interface Alternative {
