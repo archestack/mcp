@@ -1,6 +1,6 @@
 {
   "name": "@archestack/mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "MCP server for Archestack: search, rank and compare open-source AI projects from archestack.com's open data",
   "mcpName": "io.github.archestack/mcp",
   "license": "MIT",
