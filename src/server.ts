@@ -78,7 +78,7 @@ export function createServer(api: Api, version: string) {
     {
       title: 'Search projects',
       description:
-        'Find open-source AI projects across both Archestack lists by words and filters. Words match names, repos, taglines, categories and the products a project replaces; results rank by how many words match, then exact names, then projects whose name or category holds the words, then by score. Put hard needs in the filters, not the words (no_gpu instead of "without a GPU").',
+        'Find open-source AI projects across both Archestack lists by words and filters. Words match names, repos, taglines, categories and the products a project replaces; results rank by how many words match, then exact names, then projects whose name or category holds the words, then by score. Put hard needs in the filters, not the words (no_gpu instead of "without a GPU"). Use it when the user describes a need rather than naming a project; for a ranking of one category use top_in_category, for replacements of a named paid product use alternatives_to.',
       inputSchema: searchInput,
       annotations: READ_ONLY,
     },
@@ -90,7 +90,7 @@ export function createServer(api: Api, version: string) {
     {
       title: 'Get a project',
       description:
-        'Everything Archestack has on one project: score and the parts it is made of, place in its category, GitHub facts (stars, license, last commit and release, language, Docker, arm64, GPU, RAM, external services, port), project health, demo and docs links, and the review (summary, audience, strengths, weaknesses).',
+        'Everything Archestack has on one project: score and the parts it is made of, place in its category, GitHub facts (stars, license, last commit and release, language, Docker, arm64, GPU, RAM, external services, port), project health, demo and docs links, and the review (summary, audience, strengths, weaknesses). Use it when the user names one project and wants the full picture; for only what it takes to install it use deploy_facts, for two or more projects use compare.',
       inputSchema: z.object({ project: projectRef }),
       annotations: READ_ONLY,
     },
@@ -102,7 +102,7 @@ export function createServer(api: Api, version: string) {
     {
       title: 'What it takes to run a project',
       description:
-        'The facts an agent needs before installing or deploying one project: Docker files, arm64 build, GPU need, minimum RAM, outside services it needs, web port, what its README says it needs, docs and demo links, and upkeep (latest release, releases in 12 months, security advisories, its package). null means Archestack does not know. Archestack does not track hosting cost or deploy templates.',
+        'The facts an agent needs before installing or deploying one project: Docker files, arm64 build, GPU need, minimum RAM, outside services it needs, web port, what its README says it needs, docs and demo links, and upkeep (latest release, releases in 12 months, security advisories, its package). null means Archestack does not know. Archestack does not track hosting cost or deploy templates. Use it right before installing or self-hosting a project; for its score and review use get_project.',
       inputSchema: z.object({ project: projectRef }),
       annotations: READ_ONLY,
     },
@@ -114,7 +114,7 @@ export function createServer(api: Api, version: string) {
     {
       title: 'Top projects in a category',
       description:
-        'The ranking of one category, best first, with score and tagline. An unknown category returns the list of categories.',
+        'The ranking of one category, best first, with score and tagline. An unknown category returns the list of categories, so calling it with a guess is a cheap way to learn the category ids. Use it for "what is the best X"; to filter by GPU, arm64 or license, or to search across categories, use search_projects.',
       inputSchema: categoryInput,
       annotations: READ_ONLY,
     },
@@ -126,7 +126,7 @@ export function createServer(api: Api, version: string) {
     {
       title: 'Compare projects',
       description:
-        'Put 2 to 4 projects side by side: score and its parts, place, stars, license, last commit, Docker, arm64, GPU, RAM, external services, strengths and weaknesses.',
+        'Put 2 to 4 projects side by side: score and its parts, place, stars, license, last commit, Docker, arm64, GPU, RAM, external services, strengths and weaknesses. Use it when the user is choosing between named projects ("X or Y"); with only one name, find candidates first with top_in_category or alternatives_to.',
       inputSchema: z.object({ projects: z.array(projectRef).min(2).max(4) }),
       annotations: READ_ONLY,
     },
@@ -138,7 +138,7 @@ export function createServer(api: Api, version: string) {
     {
       title: 'Check a repo before installing it',
       description:
-        'Check a GitHub repo before installing it, most useful for an MCP server, skill or plugin: whether Archestack lists it, its license in plain words, upkeep, the safety checks it passed (with the failed ones and their evidence) and up to 3 higher-ranked projects in its category. "Checks passed" means those checks passed, not that the code is safe. A repo Archestack does not list returns listed: false and a link to suggest it.',
+        'Check a GitHub repo before installing it, most useful for an MCP server, skill or plugin: whether Archestack lists it, its license in plain words, upkeep, the safety checks it passed (with the failed ones and their evidence) and up to 3 higher-ranked projects in its category. "Checks passed" means those checks passed, not that the code is safe. A repo Archestack does not list returns listed: false and a link to suggest it. Use it when the user pastes a GitHub link they plan to install or run; for a project they name without a link use get_project.',
       inputSchema: z.object({
         repo: z
           .string()
@@ -156,7 +156,7 @@ export function createServer(api: Api, version: string) {
     {
       title: 'Open-source alternatives',
       description:
-        'Open-source projects that replace a paid or closed product (e.g. Cursor, ChatGPT, Notion), highest score first. own_claim is true when the project says so in its own README.',
+        'Open-source projects that replace a paid or closed product (e.g. Cursor, ChatGPT, Notion), highest score first. own_claim is true when the project says so in its own README. Use it when the user names a product and asks what can replace it or how to self-host it instead; to weigh the picks against each other, pass them to compare.',
       inputSchema: z.object({
         product: z.string().min(1).max(100).describe('Product name, e.g. "Cursor"'),
       }),
