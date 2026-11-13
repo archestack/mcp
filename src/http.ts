@@ -6,6 +6,13 @@ import { createMcpHandler } from '@modelcontextprotocol/server';
 import type { Api } from './api.js';
 import { claudeResponse, createRegistry, registryResponse, type Registry } from './registry.js';
 import { createServer } from './server.js';
+import {
+  AI_CATALOG_TYPE,
+  aiCatalog,
+  SERVER_CARD_PATH,
+  SERVER_CARD_TYPE,
+  serverCard,
+} from './server-card.js';
 
 // Cloudflare's rate limiting binding: a count per key per minute in each location.
 export interface Limiter {
@@ -46,6 +53,18 @@ export function createHttpHandler(api: Api, version: string, officialRegistry?: 
     if (pathname === '/health') return text(200, `ok ${version}`);
     if (pathname === '/.well-known/openai-apps-challenge' && openaiChallenge) {
       return text(200, openaiChallenge);
+    }
+    if (pathname === SERVER_CARD_PATH || pathname === '/.well-known/ai-catalog.json') {
+      if (request.method !== 'GET' && request.method !== 'HEAD') return text(405, 'GET only');
+      const card = pathname === SERVER_CARD_PATH;
+      return withCors(
+        new Response(JSON.stringify(card ? serverCard(version) : aiCatalog()), {
+          headers: {
+            'content-type': card ? SERVER_CARD_TYPE : AI_CATALOG_TYPE,
+            'cache-control': 'public, max-age=3600',
+          },
+        }),
+      );
     }
     const lists = pathname.startsWith('/registry/') || pathname.startsWith('/allowlist/');
     if (pathname !== '/mcp' && !lists) {

@@ -340,6 +340,34 @@ describe('remote server over HTTP', () => {
     assert.equal(await res.text(), 'token-123');
   });
 
+  it('serves a Server Card and an AI Catalog that match server.json and point at each other', async () => {
+    const manifest = JSON.parse(
+      await readFile(fileURLToPath(new URL('../server.json', import.meta.url)), 'utf8'),
+    );
+    const res = await handle(new Request('https://mcp.test/mcp/server-card'));
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-type'), 'application/mcp-server-card+json');
+    assert.equal(res.headers.get('access-control-allow-origin'), '*');
+    const card = await res.json();
+    assert.equal(card.name, manifest.name);
+    assert.equal(card.version, '0.0.0-test'); // the version the handler was built with
+    assert.equal(card.description, manifest.description);
+    assert.equal(card.websiteUrl, manifest.websiteUrl);
+    assert.deepEqual(card.repository, manifest.repository);
+    assert.equal(card.remotes[0].type, manifest.remotes[0].type);
+    assert.equal(card.remotes[0].url, manifest.remotes[0].url);
+
+    const catalogRes = await handle(new Request('https://mcp.test/.well-known/ai-catalog.json'));
+    assert.equal(catalogRes.status, 200);
+    assert.equal(catalogRes.headers.get('content-type'), 'application/ai-catalog+json');
+    const catalog = await catalogRes.json();
+    assert.equal(catalog.entries[0].type, 'application/mcp-server-card+json');
+    assert.equal(catalog.entries[0].url, 'https://mcp.archestack.com/mcp/server-card');
+
+    const post = await handle(new Request('https://mcp.test/mcp/server-card', { method: 'POST' }));
+    assert.equal(post.status, 405);
+  });
+
   it('serves the allowlist as a v0.1 MCP registry, each entry the official record of the checked version', async () => {
     const list = await handle(new Request('https://mcp.test/registry/v0.1/servers'));
     assert.equal(list.status, 200);
