@@ -168,8 +168,11 @@ export function createServer(api: Api, version: string) {
   return server;
 }
 
-const reply = (body: object) => ({
+// The same answer twice: structuredContent for clients that read objects, and the JSON text block
+// the spec asks tools to keep for clients that only read text.
+const reply = (body: Record<string, unknown>) => ({
   content: [{ type: 'text' as const, text: JSON.stringify(body) }],
+  structuredContent: body,
 });
 
 async function searchProjects(api: Api, args: z.output<typeof searchInput>) {

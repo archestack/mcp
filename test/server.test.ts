@@ -105,6 +105,16 @@ describe('archestack-mcp over stdio', () => {
     );
   });
 
+  it('every answer carries the same JSON as structuredContent and as text', async () => {
+    const result = await client.callTool({
+      name: 'get_project',
+      arguments: { project: 'Qdrant' },
+    });
+    const [first] = result.content as { text: string }[];
+    assert.deepEqual(result.structuredContent, JSON.parse(first!.text));
+    assert.equal((result.structuredContent as { id: string }).id, 'best-of-ai/qdrant');
+  });
+
   it('search_projects ranks word matches and keeps to the GPU filter', async () => {
     const body = await answer('search_projects', {
       query: 'vector database',
