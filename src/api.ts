@@ -6,7 +6,8 @@ import ky from 'ky';
 export const DEFAULT_API_URL = 'https://archestack.com/api/v1/';
 const HOUR_MS = 60 * 60 * 1000;
 
-type SchemaName = 'index' | 'projects' | 'category' | 'project' | 'alternative' | 'allowlist';
+type SchemaName =
+  'index' | 'projects' | 'category' | 'project' | 'alternative' | 'allowlist' | 'rising';
 type Gpu = 'none' | 'optional' | 'required' | 'unknown';
 
 export interface Ref {
@@ -179,6 +180,33 @@ export interface Alternative {
   picks: (Ref & { own_claim: boolean })[];
 }
 
+// The projects that gained the most GitHub stars in the last 7 and 30 complete UTC days, from
+// GitHub's daily star counts, both lists merged by stars gained (API 2026-11-23).
+export interface RiseRow {
+  id: string;
+  name: string;
+  repo: string;
+  list: string;
+  category: { id: string; title: string; url: string };
+  gain: number;
+  growth: number | null; // gain over the stars at the window start; null when it started at 0
+  stars: number;
+  place: number;
+  score: number;
+  tagline: string;
+  url: string;
+  page: string;
+  source_url: string;
+  checked_at: string | null;
+}
+
+export interface Rising {
+  updated: string;
+  rule: string;
+  week: { from: string; to: string; projects: RiseRow[] } | null;
+  month: { from: string; to: string; projects: RiseRow[] } | null;
+}
+
 export type Api = ReturnType<typeof createApi>;
 
 // Turns a published JSON Schema into a check; `data` is the document as the schema keeps it.
@@ -232,6 +260,7 @@ export function createApi(baseUrl: string, version: string, compile?: Compile) {
     project: (url: string) => doc<Project>('project', pathOf(url)),
     alternative: (url: string) => doc<Alternative>('alternative', pathOf(url)),
     allowlist: () => doc<Allowlist>('allowlist', 'allowlist.json'),
+    rising: () => doc<Rising>('rising', 'rising.json'),
   };
 }
 

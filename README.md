@@ -2,7 +2,9 @@
 
 [![npm](https://img.shields.io/npm/v/%40archestack%2Fmcp?label=npm)](https://www.npmjs.com/package/@archestack/mcp) [![license: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/archestack/mcp/blob/main/LICENSE)
 
-Ask your assistant about open-source AI projects and get answers from the [Archestack](https://archestack.com/) rankings: scores, GitHub facts, reviews and open-source picks for paid tools.
+Give your coding agent current facts about open-source AI tools before it picks one. Describe a problem and it gets ranked picks for each layer of the stack, with strengths, trade-offs and what each needs to run. It can also see what gained the most GitHub stars this week, map a whole category, and check one project against your limits (no GPU, arm64, RAM, license, outside services) before you adopt it. Answers come from the [Archestack](https://archestack.com/) rankings: scores, GitHub facts refreshed twice a day, reviews, pinned start commands and safety checks.
+
+Your model's training data stops at a date. These lists don't: projects that showed up last month are in them, and a project that stopped shipping drops down.
 
 It covers two lists:
 
@@ -71,18 +73,33 @@ Then point your client at `node /full/path/to/archestack-mcp/dist/index.js` inst
 
 ## Tools
 
+Choosing and applying:
+
+| Tool               | What it does                                                                                                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `recommend_stack`  | A problem in words → the best-ranked projects for each layer (model serving, vector database, chat UI, agents...), with why, trade-offs and facts |
+| `how_to_apply`     | One project against your limits (GPU, arm64, RAM, license, outside services, Docker): verdict, start command, pitfalls, better-fitting options    |
+| `trending`         | Most GitHub stars gained in the last 7 or 30 days, and the categories gaining most                                                                |
+| `explain_category` | One field mapped: leaders with a strength and a weakness each, license and GPU mix, the best pick per need, thin spots                            |
+
+Looking up:
+
 | Tool              | What it does                                                                                                    |
 | ----------------- | --------------------------------------------------------------------------------------------------------------- |
 | `search_projects` | Finds projects by words and filters: list, category, license family, runs without a GPU, arm64 build, live demo |
 | `get_project`     | One project in full: score and its parts, place in its category, GitHub facts, health, links, review            |
-| `deploy_facts`    | What it takes to run one project: Docker, arm64, GPU, RAM, outside services, port, its stated needs, upkeep      |
+| `deploy_facts`    | What it takes to run one project: Docker, arm64, GPU, RAM, outside services, port, its stated needs, upkeep     |
 | `top_in_category` | The ranking of one category, best first                                                                         |
 | `compare`         | 2 to 4 projects side by side                                                                                    |
 | `check_repo`      | Before you install a GitHub repo: listed or not, license, upkeep, safety checks passed and failed, higher picks |
 | `alternatives_to` | Open-source picks for a paid product, such as Cursor or ChatGPT                                                 |
 
-All seven are read-only. Things to ask:
+All eleven are read-only: they recommend and explain, they never install or run anything. Things to ask:
 
+- "I want to chat with our PDFs on a laptop, no cloud. What stack?"
+- "What's rising in coding agents this month?"
+- "Map the vector database options for me"
+- "Will Qdrant run on my 8 GB Raspberry Pi with an Apache-style license?"
 - "Which vector database runs without a GPU?"
 - "Open-source alternatives to Cursor"
 - "Compare Open WebUI and LibreChat"

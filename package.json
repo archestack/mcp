@@ -1,7 +1,7 @@
 {
   "name": "@archestack/mcp",
-  "version": "0.3.2",
-  "description": "MCP server for Archestack: search, rank and compare open-source AI projects from archestack.com's open data",
+  "version": "0.4.0",
+  "description": "MCP server for Archestack: recommend an open-source AI stack for a problem, see rising projects, map a category and check a project against your limits, from archestack.com's live rankings",
   "mcpName": "io.github.archestack/mcp",
   "license": "MIT",
   "author": "Archestack (https://archestack.com/)",
@@ -28,7 +28,14 @@
     "ai-tools",
     "coding-agents",
     "vector-database",
-    "rankings"
+    "rankings",
+    "tech-stack",
+    "recommendations",
+    "trending",
+    "github-trending",
+    "library-selection",
+    "rag",
+    "ai-agents"
   ],
   "type": "module",
   "bin": {

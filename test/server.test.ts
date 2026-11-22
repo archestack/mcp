@@ -87,16 +87,20 @@ async function answer(name: string, args: Record<string, unknown>) {
 }
 
 describe('archestack-mcp over stdio', () => {
-  it('lists seven read-only tools', async () => {
+  it('lists eleven read-only tools', async () => {
     const { tools } = await client.listTools();
     assert.deepEqual(tools.map((t) => t.name).sort(), [
       'alternatives_to',
       'check_repo',
       'compare',
       'deploy_facts',
+      'explain_category',
       'get_project',
+      'how_to_apply',
+      'recommend_stack',
       'search_projects',
       'top_in_category',
+      'trending',
     ]);
     assert.ok(
       tools.every(
@@ -272,6 +276,15 @@ describe('archestack-mcp over stdio', () => {
       answer('top_in_category', { category: 'vector-db', limit: 5 }).then((b) => b.projects),
       answer('compare', { projects: ['Open WebUI', 'librechat'] }).then((b) => b.projects),
       answer('alternatives_to', { product: 'Cursor' }).then((b) => b.picks),
+      answer('recommend_stack', { problem: 'search', layers: ['vector-db'] }).then(
+        (b) => b.layers[0].picks,
+      ),
+      answer('trending', { limit: 5 }).then((b) => b.projects),
+      answer('explain_category', { category: 'vector-db' }).then((b) => b.leaders),
+      answer('how_to_apply', { project: 'Qdrant', no_gpu: true }).then((b) => [
+        b,
+        ...b.alternatives_that_fit.map((p: object) => ({ ...p, checked_at: b.checked_at })),
+      ]),
     ]);
     for (const projects of answers) {
       assert.ok(projects.length > 0);
@@ -281,6 +294,123 @@ describe('archestack-mcp over stdio', () => {
         assert.match(p.checked_at, /^\d{4}-\d{2}-\d{2}$/);
       }
     }
+  });
+
+  it('recommend_stack gives ranked picks per named layer that pass the filters, with why and trade-offs', async () => {
+    const body = await answer('recommend_stack', {
+      problem: 'semantic search over a product catalog',
+      layers: ['vector databases', 'chat ui'],
+      no_gpu: true,
+      license: 'permissive',
+      picks: 3,
+    });
+    assert.deepEqual(
+      body.layers.map((l: { category: string }) => l.category),
+      ['best-of-ai/vector-db (Vector databases)', 'best-of-ai/chat-ui (Chat UIs)'],
+    );
+    const expected = recorded.projects
+      .filter(
+        (p) =>
+          p.list === 'best-of-ai' &&
+          p.category === 'vector-db' &&
+          p.license_family === 'permissive' &&
+          ['none', 'optional'].includes((p as { gpu?: string }).gpu ?? ''),
+      )
+      .map((p) => p.id);
+    const [vector] = body.layers;
+    assert.equal(vector.passing_filters, expected.length);
+    assert.ok(vector.picks.every((p: { id: string }) => expected.includes(p.id)));
+    const qdrant = vector.picks.find((p: { id: string }) => p.id === 'best-of-ai/qdrant');
+    assert.ok(qdrant.why.length > 0 && qdrant.trade_offs.length > 0);
+    assert.ok(Array.isArray(qdrant.matches));
+    assert.match(body.next, /how_to_apply/);
+  });
+
+  it('recommend_stack picks layers from the problem and skips what the user rules out', async () => {
+    const body = await answer('recommend_stack', {
+      problem: 'chat with our PDF documents on a laptop, no cloud',
+    });
+    const cats = body.layers.map((l: { category: string }) => l.category.split(' ')[0]);
+    assert.ok(cats.includes('best-of-ai/rag-knowledge'), cats.join());
+    assert.ok(cats.includes('best-of-ai/chat-ui'), cats.join());
+    assert.ok(!cats.some((c: string) => c.endsWith('cloud-reference')), cats.join());
+    const { isError, text } = await call('recommend_stack', { problem: 'qqqq zzzz' });
+    assert.equal(isError, true);
+    assert.match(text, /No category on Archestack matches.*best-of-ai\/vector-db/);
+  });
+
+  it('trending ranks by stars gained and sums the categories gaining', async () => {
+    const rising = JSON.parse(await readFile(new URL('rising.json', fixtures), 'utf8'));
+    const body = await answer('trending', { limit: 40 });
+    assert.equal(body.from, rising.week.from);
+    assert.equal(body.total, rising.week.projects.length);
+    const gains = body.projects.map((p: { stars_gained: number }) => p.stars_gained);
+    assert.deepEqual(
+      gains,
+      [...gains].sort((a, b) => b - a),
+    );
+    const [lead] = body.categories_gaining;
+    const inLead = body.projects.filter((p: { category: string }) => p.category === lead.category);
+    assert.equal(lead.projects, inLead.length);
+    assert.equal(
+      lead.stars_gained,
+      inLead.reduce((n: number, p: { stars_gained: number }) => n + p.stars_gained, 0),
+    );
+    assert.ok(body.categories_gaining.length <= 8);
+    const month = await answer('trending', { window: 'month', list: 'best-of-ai', limit: 3 });
+    assert.equal(month.from, rising.month.from);
+    assert.ok(month.projects.every((p: { id: string }) => p.id.startsWith('best-of-ai/')));
+    const top = rising.week.projects[0];
+    const one = await answer('trending', { category: top.category.id, list: top.list });
+    assert.ok(
+      one.projects.every((p: { category: string }) => p.category.includes(top.category.id)),
+    );
+    assert.equal(one.projects[0].id, top.id);
+  });
+
+  it('explain_category maps a field: leaders, mix, best pick per need, thin spots', async () => {
+    const body = await answer('explain_category', { category: 'Vector databases' });
+    const rows = recorded.projects.filter(
+      (p) => p.list === 'best-of-ai' && p.category === 'vector-db',
+    );
+    assert.equal(body.category, 'best-of-ai/vector-db (Vector databases)');
+    assert.equal(body.leaders[0].place, 1);
+    const sum = (o: Record<string, number>) => Object.values(o).reduce((n, v) => n + v, 0);
+    assert.equal(sum(body.mix.license), rows.length);
+    assert.equal(sum(body.mix.gpu), rows.length);
+    assert.equal(body.best_for.permissive.id, 'best-of-ai/milvus');
+    assert.ok(Array.isArray(body.thin_spots));
+    assert.ok(body.leaders.find((l: { id: string }) => l.id === 'best-of-ai/qdrant').strength);
+    assert.ok(body.rising_this_week.projects.length >= 0);
+  });
+
+  it('how_to_apply checks each limit, gives setup and pitfalls, and fitting alternatives', async () => {
+    const body = await answer('how_to_apply', {
+      project: 'Qdrant',
+      use_case: 'semantic search over a product catalog',
+      no_gpu: true,
+      arm64: true,
+      ram_gb: 4,
+      permissive_only: true,
+    });
+    assert.deepEqual(
+      body.checks.map((c: { ok: boolean | null }) => c.ok),
+      [true, true, null, true],
+    );
+    assert.match(body.verdict, /^fits, but unknown: fits in 4 GB RAM/);
+    assert.match(body.setup.command.command, /docker run/);
+    assert.ok(body.pitfalls.length > 0);
+    assert.ok(body.use_case.strengths.length > 0);
+    assert.ok(
+      body.alternatives_that_fit.every(
+        (p: { id: string; gpu: string; arm64: boolean }) =>
+          p.id !== 'best-of-ai/qdrant' && ['none', 'optional'].includes(p.gpu) && p.arm64,
+      ),
+    );
+    const gpu = await answer('how_to_apply', { project: 'best-of-ai/ai-toolkit', no_gpu: true });
+    assert.match(gpu.verdict, /^does not fit: runs without a GPU/);
+    const none = await answer('how_to_apply', { project: 'Qdrant' });
+    assert.match(none.verdict, /^no limits given/);
   });
 
   it('refuses a document that does not match the published schema', async () => {
@@ -324,7 +454,7 @@ describe('remote server over HTTP', () => {
       }),
     );
     const { tools } = await remote.listTools();
-    assert.equal(tools.length, 7);
+    assert.equal(tools.length, 11);
     const result = await remote.callTool({ name: 'get_project', arguments: { project: 'Qdrant' } });
     const [first] = result.content as { text: string }[];
     assert.equal(JSON.parse(first!.text).id, 'best-of-ai/qdrant');
