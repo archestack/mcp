@@ -233,12 +233,21 @@ async function recommendStack(api: Api, args: z.output<typeof stackInput>) {
     // The two lists hold the same kind of category under one first word ("RAG and knowledge" apps,
     // "RAG and search" starters): keep the stronger one as the layer, name the other.
     const kind = (c: Cat) => wordsOf(c.title)[0] ?? c.id;
+    const wantsStarter = words.some((w) =>
+      /^(starters?|templates?|boilerplates?|scaffold\w*|kits?)$/.test(w),
+    );
     const top = ranked[0]?.weight ?? 0;
     for (const { c, weight } of ranked) {
       if (weight * 2 < top) break; // under half the strongest match: noise, not a layer
       const twin = layers.find((l) => l.category.list !== c.list && kind(l.category) === kind(c));
       if (twin) {
-        twin.others.push(c);
+        // best-of-ai holds apps to run, best-of-vibe-coding starters to build from: the app wins
+        // unless the user asks for a starter or template.
+        if (c.list === 'best-of-ai' && !wantsStarter) {
+          twin.others.push(twin.category);
+          twin.category = c;
+          twin.asked = c.title;
+        } else twin.others.push(c);
         continue;
       }
       if (layers.length === 4) break;
