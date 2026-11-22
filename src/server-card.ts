@@ -13,7 +13,8 @@ export function serverCard(version: string) {
     name: 'io.github.archestack/mcp',
     version,
     title: 'Archestack',
-    description: "Search, rank and compare open-source AI projects with Archestack's open data",
+    description:
+      'Pick open-source AI tools from live rankings: stack per problem, rising projects, fit checks',
     websiteUrl: 'https://archestack.com/api/',
     repository: { url: 'https://github.com/archestack/mcp', source: 'github' },
     remotes: [
