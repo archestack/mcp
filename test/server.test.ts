@@ -214,6 +214,23 @@ describe('archestack-mcp over stdio', () => {
     assert.match(body.source_url, /^https:\/\/archestack\.com\//);
   });
 
+  it('deploy_facts carries the pinned start command and variable names, null when there is none', async () => {
+    const body = await answer('deploy_facts', { project: 'Open WebUI' });
+    assert.ok(body.setup, 'Open WebUI has a setup in the recorded API');
+    assert.match(body.setup.command, /docker compose up|docker run/);
+    assert.match(body.setup.source, /^https:\/\/github\.com\//);
+    assert.ok(body.setup.release.length > 0);
+    assert.ok(
+      body.setup.env.every(
+        (e: { name: string; secret: boolean }) =>
+          typeof e.name === 'string' && typeof e.secret === 'boolean',
+      ),
+    );
+    const none = await answer('deploy_facts', { project: 'Qdrant' });
+    assert.ok('setup' in none);
+    assert.ok(none.setup === null || typeof none.setup.command === 'string');
+  });
+
   it('top_in_category takes a category title and a limit', async () => {
     const body = await answer('top_in_category', { category: 'Vector databases', limit: 3 });
     assert.equal(body.id, 'vector-db');

@@ -102,7 +102,7 @@ export function createServer(api: Api, version: string) {
     {
       title: 'What it takes to run a project',
       description:
-        'The facts an agent needs before installing or deploying one project: Docker files, arm64 build, GPU need, minimum RAM, outside services it needs, web port, what its README says it needs, docs and demo links, and upkeep (latest release, releases in 12 months, security advisories, its package). null means Archestack does not know. Archestack does not track hosting cost or deploy templates. Use it right before installing or self-hosting a project; for its score and review use get_project.',
+        'The facts an agent needs before installing or deploying one project: Docker files, arm64 build, GPU need, minimum RAM, outside services it needs, web port, what its README says it needs, the start command from its own compose file or README pinned to a release (setup: command, source link, variable names with secret flags, ports), docs and demo links, and upkeep (latest release, releases in 12 months, security advisories, its package). null means Archestack does not know. Archestack does not track hosting cost or deploy templates. Use it right before installing or self-hosting a project; for its score and review use get_project.',
       inputSchema: z.object({ project: projectRef }),
       annotations: READ_ONLY,
     },
@@ -216,6 +216,7 @@ async function deployFacts(api: Api, ref: string) {
     external_deps: d.facts.external_deps,
     web_port: d.facts.web_port ?? null,
     needs: d.review.needs ?? [],
+    setup: d.setup ?? null,
     language: d.facts.language,
     license: d.facts.license_words,
     docs: d.links.docs,

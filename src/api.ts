@@ -61,6 +61,16 @@ export interface Category {
   projects: Ref[];
 }
 
+export interface Setup {
+  kind: 'compose' | 'run';
+  command: string;
+  source: string;
+  release: string;
+  checked: string;
+  env: { name: string; secret: boolean }[];
+  ports: number[];
+}
+
 export interface Project {
   version: string;
   license: string;
@@ -97,6 +107,9 @@ export interface Project {
   };
   health?: Health | null;
   safety?: Safety | null;
+  // How to start it: the project's own compose file or README `docker run`, pinned to a release
+  // (API 2026-11-21). null when none could be read; absent on older API copies.
+  setup?: Setup | null;
   checked: string;
   source_url?: string;
   checked_at?: string | null;
