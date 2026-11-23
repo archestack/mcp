@@ -12,6 +12,7 @@ import {
   findCategory,
   findProject,
   listId,
+  withStaleFlag,
   passesFilters,
   projectRef,
   READ_ONLY,
@@ -639,7 +640,7 @@ async function howToApply(api: Api, args: z.output<typeof fitInput>) {
         }
       : {}),
     setup: {
-      command: d.setup ?? null,
+      command: withStaleFlag(d.setup, d.facts.last_release),
       docker: f.docker,
       arm64: f.arm64,
       gpu: f.gpu,

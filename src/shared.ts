@@ -1,7 +1,7 @@
 // What every tool shares: the citation line, the read-only annotations, input pieces, the reply
 // shape, and the matching of words, categories and projects against the API documents.
 import { z } from 'zod';
-import type { Index, Row } from './api.js';
+import type { Index, Row, Setup } from './api.js';
 
 export const SOURCE =
   "Archestack, https://archestack.com/ (data CC BY 4.0: link each project's source_url and give its checked_at date)";
@@ -174,4 +174,22 @@ export function findProject(projects: Row[], ref: string) {
   throw new Error(
     `No project "${ref}" on Archestack.${near.length ? ` Close: ${near.map((p) => p.id).join(', ')}.` : ' Try search_projects.'}`,
   );
+}
+
+// The start command is read from the project's files at one release on one day. When the project
+// has published a newer release since that day, say so: the pinned command may be out of date
+// (T-317: stale facts say so in the answer). Same-day releases are not flagged: the date is the
+// finest grain both fields have.
+export function withStaleFlag(setup: Setup | null | undefined, lastRelease: string | null) {
+  if (!setup) return null;
+  const stale = lastRelease !== null && lastRelease > setup.checked;
+  return {
+    ...setup,
+    stale,
+    ...(stale
+      ? {
+          stale_note: `A newer release (${lastRelease}) came out after these facts were read on ${setup.checked} at ${setup.release}. Check the project's own docs before running the command.`,
+        }
+      : {}),
+  };
 }
