@@ -12,6 +12,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import type * as ApiModule from '../src/api.js';
 import type * as HttpModule from '../src/http.js';
+import type * as SharedModule from '../src/shared.js';
 
 // The built files, as the Worker bundles them (typed from their sources).
 const built = (file: string) => import(new URL(`../dist/${file}`, import.meta.url).href);
@@ -233,6 +234,30 @@ describe('archestack-mcp over stdio', () => {
     const none = await answer('deploy_facts', { project: 'Qdrant' });
     assert.ok('setup' in none);
     assert.ok(none.setup === null || typeof none.setup.command === 'string');
+  });
+
+  it('deploy_facts flags a start command when a newer release came out after it was read', async () => {
+    const { withStaleFlag } = (await built('shared.js')) as typeof SharedModule;
+    const setup = {
+      kind: 'compose' as const,
+      command: 'docker compose up -d',
+      source: 'https://github.com/o/r/blob/v1/docker-compose.yaml',
+      release: 'v1',
+      checked: '2026-11-19',
+      env: [],
+      ports: [80],
+    };
+    const fresh = withStaleFlag(setup, '2026-11-17');
+    assert.equal(fresh?.stale, false);
+    assert.ok(!('stale_note' in fresh!));
+    assert.equal(withStaleFlag(setup, '2026-11-19')?.stale, false, 'same day is not flagged');
+    const stale = withStaleFlag(setup, '2026-11-20');
+    assert.equal(stale?.stale, true);
+    assert.match(stale!.stale_note!, /2026-11-20.*2026-11-19.*v1/);
+    assert.equal(withStaleFlag(setup, null)?.stale, false);
+    assert.equal(withStaleFlag(null, '2026-11-20'), null);
+    const body = await answer('deploy_facts', { project: 'Open WebUI' });
+    assert.equal(typeof body.setup.stale, 'boolean');
   });
 
   it('top_in_category takes a category title and a limit', async () => {
