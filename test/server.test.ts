@@ -383,6 +383,18 @@ describe('archestack-mcp over stdio', () => {
     );
   });
 
+  it('recommend_stack gives a RAG problem its vector database, and ChatGPT a chat UI', async () => {
+    const layersOf = async (problem: string) =>
+      (await answer('recommend_stack', { problem })).layers.map(
+        (l: { category: string }) => l.category.split(' ')[0],
+      );
+    const rag = await layersOf('local RAG with no cloud');
+    for (const id of ['best-of-ai/rag-knowledge', 'best-of-ai/vector-db'])
+      assert.ok(rag.includes(id), rag.join());
+    const gpt = await layersOf('self-hosted ChatGPT for my team');
+    assert.ok(gpt.includes('best-of-ai/chat-ui'), gpt.join());
+  });
+
   it('trending ranks by stars gained and sums the categories gaining', async () => {
     const rising = JSON.parse(await readFile(new URL('rising.json', fixtures), 'utf8'));
     const body = await answer('trending', { limit: 40 });
