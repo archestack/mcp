@@ -371,6 +371,10 @@ describe('archestack-mcp over stdio', () => {
     const why = plain.layers.map((l: { picked_because: string }) => l.picked_because);
     assert.ok(why.length > 0, 'a layer is picked');
     assert.ok(!why.some((w: string) => /server/.test(w)), why.join(' | '));
+    assert.ok(
+      why.every((w: string) => w.startsWith('the problem names it')),
+      `a guessed layer next to a named one: ${why.join(' | ')}`,
+    );
     const mcp = await answer('recommend_stack', { problem: 'MCP server for Jira' });
     const mcpCats = mcp.layers.map((l: { category: string }) => l.category.split(' ')[0]);
     assert.ok(
