@@ -138,6 +138,7 @@ const INTENT_WORDS = new Set(
     ' ',
   ),
 );
+const MATCH_ONLY = 'its projects match the problem';
 const NEGATIONS = new Set(['no', 'not', 'non', 'without', 'never', 'avoid', 'except']);
 // The words that say what a problem is about; a word right after "no", "without" or "not" is a
 // thing the user does not want ("no cloud"), so it never picks a category.
@@ -263,11 +264,15 @@ async function recommendStack(api: Api, args: z.output<typeof stackInput>) {
       layers.push({
         asked: c.title,
         category: c,
-        why: named.length
-          ? `the problem names it (${named.join(', ')})`
-          : 'its projects match the problem',
+        why: named.length ? `the problem names it (${named.join(', ')})` : MATCH_ONLY,
         others: [],
       });
+    }
+    // A layer only its projects point at ("chatbot for customer support" matching coding agents)
+    // is a guess: with a layer the problem names, the guesses are dropped.
+    if (layers.some((l) => l.why !== MATCH_ONLY)) {
+      const named = layers.filter((l) => l.why !== MATCH_ONLY);
+      layers.splice(0, layers.length, ...named);
     }
   }
   if (!layers.length) {
