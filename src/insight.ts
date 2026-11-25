@@ -143,7 +143,13 @@ const NEGATIONS = new Set(['no', 'not', 'non', 'without', 'never', 'avoid', 'exc
 // thing the user does not want ("no cloud"), so it never picks a category.
 function problemWords(text: string) {
   const all = wordsOf(text);
-  const kept = all.filter((w, i) => !NEGATIONS.has(w) && !NEGATIONS.has(all[i - 1] ?? ''));
+  // "on my own server" says where it runs, not what it is: "server" points at the MCP server
+  // categories only next to "mcp".
+  const mcp = all.some((w) => w.startsWith('mcp'));
+  const kept = all.filter(
+    (w, i) =>
+      !NEGATIONS.has(w) && !NEGATIONS.has(all[i - 1] ?? '') && (mcp || !/^servers?$/.test(w)),
+  );
   return [...new Set(kept)].filter(
     (w) => w.length > 1 && !STOP_WORDS.has(w) && !INTENT_WORDS.has(w),
   );

@@ -364,6 +364,21 @@ describe('archestack-mcp over stdio', () => {
     assert.match(text, /No category on Archestack matches.*best-of-ai\/vector-db/);
   });
 
+  it('recommend_stack reads "server" as where it runs, not as the MCP server category', async () => {
+    const plain = await answer('recommend_stack', {
+      problem: 'chatbot for customer support on my own server',
+    });
+    const why = plain.layers.map((l: { picked_because: string }) => l.picked_because);
+    assert.ok(why.length > 0, 'a layer is picked');
+    assert.ok(!why.some((w: string) => /server/.test(w)), why.join(' | '));
+    const mcp = await answer('recommend_stack', { problem: 'MCP server for Jira' });
+    const mcpCats = mcp.layers.map((l: { category: string }) => l.category.split(' ')[0]);
+    assert.ok(
+      mcpCats.some((c: string) => c.includes('mcp')),
+      mcpCats.join(),
+    );
+  });
+
   it('trending ranks by stars gained and sums the categories gaining', async () => {
     const rising = JSON.parse(await readFile(new URL('rising.json', fixtures), 'utf8'));
     const body = await answer('trending', { limit: 40 });
