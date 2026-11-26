@@ -156,6 +156,22 @@ function problemWords(text: string) {
   );
 }
 
+// Speech tools come in two directions that share every word: "text to speech" asks for a voice,
+// "speech to text" for a transcript. 1 when the project says it does what the problem asks, -1
+// when it says only the opposite, 0 when the problem names no direction or the project is silent.
+const SAYS = /text[- ]to[- ]speech|\btts\b|voice clon|speech synthesis|read\w* aloud/i;
+const HEARS = /speech[- ]to[- ]text|\bstt\b|\basr\b|transcri|speech recognition|dictation/i;
+function directionFit(problem: string, p: Row) {
+  const wantsSay = SAYS.test(problem);
+  const wantsHear = HEARS.test(problem);
+  if (wantsSay === wantsHear) return 0;
+  const text = `${p.name} ${p.tagline}`;
+  const says = SAYS.test(text);
+  const hears = HEARS.test(text);
+  if (says === hears) return 0;
+  return says === wantsSay ? 1 : -1;
+}
+
 // Everyday words for what a category holds, so "our PDFs" points at RAG and "ollama" at model
 // serving. Used only to pick categories, never to rank projects.
 const HINTS: [RegExp, string][] = [
@@ -301,8 +317,12 @@ async function recommendStack(api: Api, args: z.output<typeof stackInput>) {
       // Archestack's ranking decides who is in the running (the top 10 that pass the filters);
       // among those, projects whose own words match the problem come first.
       .slice(0, 10)
-      .map((p) => ({ p, matched: relevance(p, words, l.category.title, '').matched }))
-      .sort((a, b) => b.matched - a.matched || a.p.place - b.p.place)
+      .map((p) => ({
+        p,
+        matched: relevance(p, words, l.category.title, '').matched,
+        fit: directionFit(args.problem, p),
+      }))
+      .sort((a, b) => b.fit - a.fit || b.matched - a.matched || a.p.place - b.p.place)
       .slice(0, args.picks);
     return { l, inCat, passing };
   });

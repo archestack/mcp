@@ -395,6 +395,21 @@ describe('archestack-mcp over stdio', () => {
     assert.ok(gpt.includes('best-of-ai/chat-ui'), gpt.join());
   });
 
+  it('recommend_stack: "text to speech" ranks voice generators first, "transcribe" the transcribers', async () => {
+    const firstPick = async (problem: string) => {
+      const body = await answer('recommend_stack', { problem, picks: 3 });
+      return body.layers[0].picks.map((p: { id: string }) => p.id);
+    };
+    const say = await firstPick('text to speech server for my app');
+    assert.ok(!say.includes('best-of-ai/whisper-cpp'), say.join());
+    assert.ok(
+      say.some((id: string) => /kokoro|pocket-tts|voicebox/.test(id)),
+      say.join(),
+    );
+    const hear = await firstPick('speech to text for my meetings');
+    assert.ok(hear.includes('best-of-ai/whisper-cpp'), hear.join());
+  });
+
   it('recommend_stack: "offline" adds no model runtime, "data" no backend, Notion and fine-tune name their layer', async () => {
     const layersOf = async (problem: string) =>
       (await answer('recommend_stack', { problem })).layers.map(
