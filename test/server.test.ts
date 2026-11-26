@@ -395,6 +395,24 @@ describe('archestack-mcp over stdio', () => {
     assert.ok(gpt.includes('best-of-ai/chat-ui'), gpt.join());
   });
 
+  it('recommend_stack: "offline" adds no model runtime, "data" no backend, Notion and fine-tune name their layer', async () => {
+    const layersOf = async (problem: string) =>
+      (await answer('recommend_stack', { problem })).layers.map(
+        (l: { category: string }) => l.category.split(' ')[0],
+      );
+    const meetings = await layersOf('transcribe meetings offline');
+    assert.deepEqual(meetings, ['best-of-ai/voice']);
+    const offline = await layersOf('run models offline on my laptop');
+    assert.ok(offline.includes('best-of-ai/model-serving'), offline.join());
+    const pdfs = await layersOf('chat with my PDFs locally without sending data to OpenAI');
+    assert.ok(!pdfs.some((c) => c.includes('backends') || c.includes('data-tools')), pdfs.join());
+    assert.ok(pdfs.includes('best-of-ai/rag-knowledge'), pdfs.join());
+    const notion = await layersOf('self-hosted alternative to Notion AI');
+    assert.ok(notion.includes('best-of-ai/rag-knowledge'), notion.join());
+    const tune = await layersOf('fine tune a small model on my data');
+    assert.ok(tune.includes('best-of-ai/training'), tune.join());
+  });
+
   it('trending ranks by stars gained and sums the categories gaining', async () => {
     const rising = JSON.parse(await readFile(new URL('rising.json', fixtures), 'utf8'));
     const body = await answer('trending', { limit: 40 });

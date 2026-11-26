@@ -134,7 +134,7 @@ export function registerInsightTools(server: McpServer, api: Api) {
 
 // Words that say what the user wants to do rather than what the tool is.
 const INTENT_WORDS = new Set(
-  'about any build building can could create do does from get help how into just let like local locally make my need needs our over should some something using use want we would you your'.split(
+  'about any build building can could create data do does from get help how into just let like local locally make my need needs our over private send sending should some something team using use want we work works would you your'.split(
     ' ',
   ),
 );
@@ -159,9 +159,9 @@ function problemWords(text: string) {
 // Everyday words for what a category holds, so "our PDFs" points at RAG and "ollama" at model
 // serving. Used only to pick categories, never to rank projects.
 const HINTS: [RegExp, string][] = [
-  [/^(pdfs?|documents?|docs|files|knowledge|wiki|notes)$/, 'rag'],
+  [/^(pdfs?|documents?|docs|files|knowledge|wiki|notes|notion|obsidian|confluence)$/, 'rag'],
   [/^(embeddings?|similarity|semantic)$/, 'vector'],
-  [/^(llms?|models?|ollama|inference|gguf|weights|offline|airgapped|laptop)$/, 'serving'],
+  [/^(llms?|models?|ollama|inference|gguf|weights)$/, 'serving'],
   [/^(chatbots?|chatgpts?)$/, 'chat'],
   [/^(rag|retrieval)$/, 'vector'],
   [/^(scrape|scraping|crawl|crawler|crawling)$/, 'scraping'],
@@ -170,7 +170,7 @@ const HINTS: [RegExp, string][] = [
   [/^(tracing|traces|evals?|monitoring|monitor)$/, 'observability'],
   [/^(coding|ide|copilot|refactor)$/, 'coding'],
   [/^(images?|videos?|diffusion)$/, 'image'],
-  [/^(finetune|finetuning|lora)$/, 'training'],
+  [/^(finetune|finetuning|finetuned|fine|tune|tuning|lora)$/, 'training'],
 ];
 const withHints = (words: string[]) => [
   ...new Set([
@@ -234,11 +234,19 @@ async function recommendStack(api: Api, args: z.output<typeof stackInput>) {
         layers.push({ asked, category: hit.category, why: 'you named it', others: hit.others });
     }
   } else {
-    const hinted = withHints(words);
-    const ranked = allCategories(index, args.list)
-      .map((c) => ({ c, ...categoryWeight(c, hinted, projects, titles) }))
-      .filter((x) => x.weight >= 2 || x.inTitle > 0)
-      .sort((a, b) => b.weight - a.weight || b.c.projects - a.c.projects);
+    const rankFor = (hinted: string[]) =>
+      allCategories(index, args.list)
+        .map((c) => ({ c, ...categoryWeight(c, hinted, projects, titles) }))
+        .filter((x) => x.weight >= 2 || x.inTitle > 0)
+        .sort((a, b) => b.weight - a.weight || b.c.projects - a.c.projects);
+    let hinted = withHints(words);
+    let ranked = rankFor(hinted);
+    // "offline" or "on my laptop" points at model serving only when nothing else names a layer:
+    // next to "transcribe meetings" it would add an LLM runtime nobody asked for.
+    if (!ranked.length && words.some((w) => /^(offline|airgapped|laptop)$/.test(w))) {
+      hinted = [...hinted, 'serving'];
+      ranked = rankFor(hinted);
+    }
     // The two lists hold the same kind of category under one first word ("RAG and knowledge" apps,
     // "RAG and search" starters): keep the stronger one as the layer, name the other.
     const kind = (c: Cat) => wordsOf(c.title)[0] ?? c.id;
