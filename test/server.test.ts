@@ -405,7 +405,10 @@ describe('archestack-mcp over stdio', () => {
     const offline = await layersOf('run models offline on my laptop');
     assert.ok(offline.includes('best-of-ai/model-serving'), offline.join());
     const pdfs = await layersOf('chat with my PDFs locally without sending data to OpenAI');
-    assert.ok(!pdfs.some((c) => c.includes('backends') || c.includes('data-tools')), pdfs.join());
+    assert.ok(
+      !pdfs.some((c: string) => c.includes('backends') || c.includes('data-tools')),
+      pdfs.join(),
+    );
     assert.ok(pdfs.includes('best-of-ai/rag-knowledge'), pdfs.join());
     const notion = await layersOf('self-hosted alternative to Notion AI');
     assert.ok(notion.includes('best-of-ai/rag-knowledge'), notion.join());
