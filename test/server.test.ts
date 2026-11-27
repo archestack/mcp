@@ -410,6 +410,24 @@ describe('archestack-mcp over stdio', () => {
     assert.ok(hear.includes('best-of-ai/whisper-cpp'), hear.join());
   });
 
+  it('recommend_stack: "generate images" puts diffusion tools before video makers', async () => {
+    const body = await answer('recommend_stack', {
+      problem: 'generate images on my own GPU',
+      picks: 3,
+    });
+    const ids = body.layers[0].picks.map((p: { id: string }) => p.id);
+    assert.ok(/comfyui|invokeai/.test(ids[0]), ids.join());
+    assert.ok(!ids.slice(0, 2).some((id: string) => /moneyprinter/.test(id)), ids.join());
+    const video = await answer('recommend_stack', {
+      problem: 'make short videos from a topic',
+      picks: 3,
+    });
+    assert.ok(
+      video.layers[0].picks.some((p: { id: string }) => /moneyprinter/.test(p.id)),
+      'video problems keep video makers',
+    );
+  });
+
   it('recommend_stack: "offline" adds no model runtime, "data" no backend, Notion and fine-tune name their layer', async () => {
     const layersOf = async (problem: string) =>
       (await answer('recommend_stack', { problem })).layers.map(
