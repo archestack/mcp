@@ -161,11 +161,23 @@ function problemWords(text: string) {
 // when it says only the opposite, 0 when the problem names no direction or the project is silent.
 const SAYS = /text[- ]to[- ]speech|\btts\b|voice clon|speech synthesis|read\w* aloud/i;
 const HEARS = /speech[- ]to[- ]text|\bstt\b|\basr\b|transcri|speech recognition|dictation/i;
+// "generate images" is the same trap in a category that also holds video makers, camera tools and
+// upscalers: a project that names diffusion or image generation first, one that is about video,
+// cameras, clips or training a model last.
+const MAKES_IMAGES =
+  /generat\w*\s+(?:\w+\s+)?(?:images?|pictures?|art|photos?)|image generat|text[- ]to[- ]image|txt2img/i;
+const IMAGE_TOOL = /diffusion|\bflux\b|text[- ]to[- ]image|image generat|generat\w* images?/i;
+const TRAINS = /\btrain\w*|fine-tun/i;
+const NOT_IMAGES = /\bvideos?\b|camera|\bnvr\b|\bclips?\b|footage|upscal|face ?swap/i;
 function directionFit(problem: string, p: Row) {
+  const text = `${p.name} ${p.tagline}`;
+  if (MAKES_IMAGES.test(problem) && !/\bvideos?\b/i.test(problem)) {
+    if (TRAINS.test(text) || NOT_IMAGES.test(text)) return -1;
+    return IMAGE_TOOL.test(text) ? 1 : 0;
+  }
   const wantsSay = SAYS.test(problem);
   const wantsHear = HEARS.test(problem);
   if (wantsSay === wantsHear) return 0;
-  const text = `${p.name} ${p.tagline}`;
   const says = SAYS.test(text);
   const hears = HEARS.test(text);
   if (says === hears) return 0;
