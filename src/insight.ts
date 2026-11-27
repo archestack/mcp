@@ -310,6 +310,20 @@ async function recommendStack(api: Api, args: z.output<typeof stackInput>) {
     if (layers.some((l) => l.why !== MATCH_ONLY)) {
       const named = layers.filter((l) => l.why !== MATCH_ONLY);
       layers.splice(0, layers.length, ...named);
+    } else {
+      // Nothing names a layer, so every one is a guess from shared words ("login and single
+      // sign-on" landing on ML libraries): a guess stands only when one of its projects matches
+      // two of the problem's words, else the problem is outside the catalog and the agent is told.
+      const need = Math.min(2, words.length);
+      const kept = layers.filter((l) =>
+        projects.some(
+          (p) =>
+            p.list === l.category.list &&
+            p.category === l.category.id &&
+            relevance(p, words, '', '').matched >= need,
+        ),
+      );
+      layers.splice(0, layers.length, ...kept);
     }
   }
   if (!layers.length) {
