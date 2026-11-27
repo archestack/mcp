@@ -428,6 +428,20 @@ describe('archestack-mcp over stdio', () => {
     );
   });
 
+  it('recommend_stack says so when the problem is outside the catalog, not a guess from shared words', async () => {
+    for (const problem of [
+      'login and single sign-on for my internal apps',
+      'build forms and collect survey answers',
+    ]) {
+      const { isError, text } = await call('recommend_stack', { problem });
+      assert.equal(isError, true, `${problem}: ${text.slice(0, 200)}`);
+      assert.match(text, /No category on Archestack matches/);
+    }
+    // a problem with a layer that names it, or two words one project matches, still answers
+    const ok = await answer('recommend_stack', { problem: 'self-hosted alternative to Zapier' });
+    assert.ok(ok.layers.length > 0);
+  });
+
   it('recommend_stack: "offline" adds no model runtime, "data" no backend, Notion and fine-tune name their layer', async () => {
     const layersOf = async (problem: string) =>
       (await answer('recommend_stack', { problem })).layers.map(
